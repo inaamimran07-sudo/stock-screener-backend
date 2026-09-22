@@ -24,15 +24,47 @@ const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 const TWELVE_DATA_KEY = process.env.TWELVE_DATA_KEY;
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
 
 // Simple in-memory storage (replace with database for production)
 const users = {};
 const orders = {};
 const stocks = {};
 
+// Seed database with test users on startup
+const seedDatabase = () => {
+  // Admin account (auto-approved)
+  users[ADMIN_EMAIL] = {
+    email: ADMIN_EMAIL,
+    password: 'admin123',
+    isAdmin: true,
+    isApproved: true,
+    username: 'Admin',
+    avatar: null
+  };
+
+  // Test user account (auto-approved for testing)
+  users['test@example.com'] = {
+    email: 'test@example.com',
+    password: 'test123',
+    isAdmin: false,
+    isApproved: true,
+    username: 'TestUser',
+    avatar: null
+  };
+
+  console.log('✓ Database seeded with test users');
+  console.log(`  Admin: ${ADMIN_EMAIL} / admin123`);
+  console.log('  Test: test@example.com / test123');
+};
+
+// Call seed on startup
+seedDatabase();
+
 // Authentication
 app.post('/api/auth/signup', (req, res) => {
   const { email, password } = req.body;
+  
   if (!email || !password) {
     return res.status(400).json({ ok: false, error: 'Email and password required' });
   }
@@ -41,30 +73,39 @@ app.post('/api/auth/signup', (req, res) => {
     return res.status(400).json({ ok: false, error: 'User already exists' });
   }
   
+  // Check if email is admin email
+  const isAdmin = email === ADMIN_EMAIL;
+  
   users[email] = {
     email,
-    password, // In production, hash this
-    isAdmin: email === process.env.ADMIN_EMAIL || false,
-    isApproved: email === process.env.ADMIN_EMAIL || false,
+    password, // In production, hash this with bcrypt
+    isAdmin: isAdmin,
+    isApproved: isAdmin, // Auto-approve if admin email
     username: null,
     avatar: null
   };
   
   res.json({
     ok: true,
-    status: users[email].isApproved ? 'Admin account created' : 'Account created - awaiting approval'
+    status: isAdmin ? 'Admin account created' : 'Account created - awaiting approval'
   });
 });
 
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
+  
   if (!email || !password) {
     return res.status(400).json({ ok: false, error: 'Email and password required' });
   }
   
   const user = users[email];
-  if (!user || user.password !== password) {
-    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+  
+  if (!user) {
+    return res.status(401).json({ ok: false, error: 'User not found' });
+  }
+  
+  if (user.password !== password) {
+    return res.status(401).json({ ok: false, error: 'Invalid password' });
   }
   
   if (!user.isApproved) {
@@ -333,10 +374,16 @@ io.on('connection', (socket) => {
   });
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ ok: true, status: 'Server is running', userCount: Object.keys(users).length });
+});
+
 // Start server
 const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
+  console.log(`📍 API base: http://localhost:${PORT}/api`);
 });
 
 module.exports = { app, server, io };
