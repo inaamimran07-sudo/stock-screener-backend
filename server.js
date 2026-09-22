@@ -124,11 +124,11 @@ const AdminSettings = sequelize.define('AdminSettings', {
   timestamps: true
 });
 
-// Routes (FIXED - pointing to root level files)
-const authRoutes = require('./backend-routes-auth')(sequelize, User);
-const userRoutes = require('./backend-routes-users')(sequelize, User);
-const messageRoutes = require('./backend-routes-messages')(sequelize, Message, User);
-const adminRoutes = require('./backend-routes-admin')(sequelize, AdminSettings, User);
+// Routes (FIXED - pointing to correct file names)
+const authRoutes = require('./auth')(sequelize, User);
+const userRoutes = require('./users')(sequelize, User);
+const messageRoutes = require('./messages')(sequelize, Message, User);
+const adminRoutes = require('./admin')(sequelize, AdminSettings, User);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
