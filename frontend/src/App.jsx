@@ -53,22 +53,35 @@ function App() {
   }, [messages]);
 
   const fetchPortfolioData = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     try {
       const holdingsRes = await fetch(`${BACKEND_URL}/portfolio/holdings`, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
       const holdingsData = await holdingsRes.json();
       if (holdingsData.ok) setHoldings(holdingsData.holdings || []);
 
       const statsRes = await fetch(`${BACKEND_URL}/portfolio/stats`, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
       const statsData = await statsRes.json();
       if (statsData.ok) setStats(statsData.stats || {});
 
       const ordersRes = await fetch(`${BACKEND_URL}/portfolio/orders`, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
       const ordersData = await ordersRes.json();
       if (ordersData.ok) setOrders(ordersData.orders || []);
@@ -79,51 +92,78 @@ function App() {
   }, [token]);
 
   const fetchUser = useCallback(async () => {
+    if (!token) return;
     try {
       const res = await fetch(`${BACKEND_URL}/users/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
       const data = await res.json();
       if (data.ok) setUser(data.user);
+      else console.error('Fetch error:', data.error);
     } catch (err) {
       console.error('Error fetching user:', err);
     }
   }, [token]);
 
   const fetchAllUsers = useCallback(async () => {
+    if (!token) return;
     try {
       const res = await fetch(`${BACKEND_URL}/users/all`, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
       const data = await res.json();
       if (data.ok) setAllUsers(data.users.filter(u => u.email !== user?.email) || []);
+      else console.error('Fetch error:', data.error);
     } catch (err) {
       console.error('Error fetching users:', err);
     }
   }, [token, user?.email]);
 
   const fetchMessages = useCallback(async (otherEmail) => {
+    if (!token) return;
     try {
       const res = await fetch(`${BACKEND_URL}/messages/${otherEmail}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
       const data = await res.json();
       if (data.ok) setMessages(data.messages || []);
+      else console.error('Fetch error:', data.error);
     } catch (err) {
       console.error('Error fetching messages:', err);
     }
   }, [token]);
 
   const fetchAdminData = useCallback(async () => {
+    if (!token) return;
     try {
       const pendingRes = await fetch(`${BACKEND_URL}/admin/pending-users`, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
       const pendingData = await pendingRes.json();
       if (pendingData.ok) setPendingUsers(pendingData.users || []);
 
       const allRes = await fetch(`${BACKEND_URL}/admin/all-users`, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
       const allData = await allRes.json();
       if (allData.ok) setAdminAllUsers(allData.users || []);
@@ -163,6 +203,7 @@ function App() {
         payload.gifUrl = content;
       }
 
+      if (!token) return;
       const res = await fetch(`${BACKEND_URL}/messages/send`, {
         method: 'POST',
         headers: {
@@ -197,8 +238,10 @@ function App() {
     if (token) {
       fetchUser();
       setPage('dashboard');
+    } else {
+      setPage('login');
     }
-  }, [token, fetchUser]);
+  }, [token]);
 
   useEffect(() => {
     if (token && user?.t212Connected && page === 'dashboard') {
