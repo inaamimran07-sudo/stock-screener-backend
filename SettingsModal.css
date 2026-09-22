@@ -1,0 +1,322 @@
+/* Settings Modal */
+.settings-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.settings-modal {
+  background: rgba(10, 14, 39, 0.95);
+  border: 2px solid var(--primary);
+  border-radius: 2px;
+  width: 90%;
+  max-width: 500px;
+  padding: 30px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid var(--primary);
+}
+
+.settings-header h2 {
+  color: var(--primary);
+  font-size: 20px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(0, 217, 255, 0.3);
+}
+
+.close-btn {
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 0, 85, 0.1);
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.3);
+}
+
+.settings-section {
+  margin-bottom: 25px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+
+.settings-section:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 10px rgba(0, 217, 255, 0.1);
+}
+
+.settings-section h3 {
+  color: var(--accent);
+  margin-bottom: 15px;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.avatar-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.avatar-upload .preview {
+  width: 100px;
+  height: 100px;
+  border: 2px solid var(--primary);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  background: rgba(0, 217, 255, 0.05);
+}
+
+.avatar-upload .preview.empty {
+  border-style: dashed;
+}
+
+.file-input-label {
+  padding: 10px 15px;
+  background: rgba(0, 217, 255, 0.1);
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  border-radius: 2px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  transition: all 0.3s;
+}
+
+.file-input-label:hover {
+  background: rgba(0, 217, 255, 0.2);
+  box-shadow: 0 0 10px rgba(0, 217, 255, 0.2);
+}
+
+.input {
+  width: 100%;
+  padding: 12px 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 2px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  margin-bottom: 12px;
+  transition: all 0.3s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 10px rgba(0, 217, 255, 0.2);
+  background: rgba(0, 217, 255, 0.05);
+}
+
+.btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-transform: uppercase;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: var(--dark);
+  margin-bottom: 12px;
+}
+
+.btn.primary:hover:not(:disabled) {
+  box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn.success {
+  background: linear-gradient(135deg, var(--accent), rgba(0, 255, 136, 0.5));
+  color: var(--dark);
+  margin-bottom: 12px;
+}
+
+.btn.success:hover:not(:disabled) {
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn.danger {
+  background: linear-gradient(135deg, var(--danger), rgba(255, 0, 85, 0.5));
+  color: white;
+  margin-bottom: 12px;
+}
+
+.btn.danger:hover:not(:disabled) {
+  box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn.logout {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  margin-top: 15px;
+}
+
+.btn.logout:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 10px rgba(0, 217, 255, 0.2);
+}
+
+.message {
+  padding: 12px 15px;
+  border-radius: 2px;
+  margin-bottom: 20px;
+  color: var(--text);
+  text-align: center;
+  font-size: 12px;
+  border: 1px solid;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message.success {
+  background: rgba(0, 255, 136, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.message.error {
+  background: rgba(255, 0, 85, 0.2);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.status {
+  color: var(--accent);
+  font-size: 13px;
+  margin-bottom: 12px;
+  text-align: center;
+  padding: 10px;
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px dashed var(--accent);
+  border-radius: 2px;
+  letter-spacing: 0.5px;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 10px;
+  text-align: center;
+  padding: 10px;
+  background: rgba(122, 138, 168, 0.1);
+  border-left: 2px solid var(--text-secondary);
+  border-radius: 2px;
+}
+
+/* Scrollbar */
+.settings-modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-modal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.settings-modal::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 3px;
+}
+
+.settings-modal::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .settings-modal {
+    width: 95%;
+    max-width: 100%;
+    padding: 20px;
+  }
+
+  .settings-header h2 {
+    font-size: 18px;
+  }
+
+  .avatar-upload .preview {
+    width: 80px;
+    height: 80px;
+  }
+}
