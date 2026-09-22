@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send } from 'lucide-react';
+import SettingsModal from './SettingsModal';
 import './App.css';
 
 const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
@@ -10,6 +11,13 @@ function App() {
   const [user, setUser] = useState(null);
   const [aiChat, setAiChat] = useState([]);
   const [aiInput, setAiInput] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  
+  // Dashboard data
+  const [holdings, setHoldings] = useState([]);
+  const [stats, setStats] = useState({ totalValue: 0, cashBalance: 0 });
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const fetchUser = useCallback(async () => {
     try {
@@ -19,7 +27,7 @@ function App() {
       const data = await res.json();
       if (data.ok) setUser(data.user);
     } catch (err) {
-      console.error('Error:', err);
+      console.error('Error fetching user:', err);
     }
   }, [token]);
 
@@ -30,8 +38,59 @@ function App() {
     }
   }, [token, fetchUser]);
 
+  // Fetch portfolio data when user changes or T212 connects
+  useEffect(() => {
+    if (token && user?.t212Connected && page === 'dashboard') {
+      fetchPortfolioData();
+    }
+  }, [token, user?.t212Connected, page]);
+
+  const fetchPortfolioData = async () => {
+    setLoading(true);
+    try {
+      // Fetch holdings
+      const holdingsRes = await fetch(`${BACKEND_URL}/portfolio/holdings`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const holdingsData = await holdingsRes.json();
+      if (holdingsData.ok) {
+        setHoldings(holdingsData.holdings || []);
+      }
+
+      // Fetch stats
+      const statsRes = await fetch(`${BACKEND_URL}/portfolio/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const statsData = await statsRes.json();
+      if (statsData.ok) {
+        setStats(statsData.stats || {});
+      }
+
+      // Fetch orders
+      const ordersRes = await fetch(`${BACKEND_URL}/portfolio/orders`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const ordersData = await ordersRes.json();
+      if (ordersData.ok) {
+        setOrders(ordersData.orders || []);
+      }
+    } catch (err) {
+      console.error('Error fetching portfolio data:', err);
+    }
+    setLoading(false);
+  };
+
   if (!token) {
     return <LoginPage onLogin={(t) => { setToken(t); localStorage.setItem('token', t); }} />;
+  }
+
+  if (showSettings) {
+    return (
+      <SettingsModal 
+        onClose={() => { setShowSettings(false); fetchUser(); }} 
+        user={user} 
+      />
+    );
   }
 
   const Sidebar = () => (
@@ -78,13 +137,29 @@ function App() {
 
       <div className="user-section">
         <div className="user-profile">
-          <div className="avatar">👤</div>
+          <div className="avatar">
+            {user?.avatar ? (
+              <img src={user.avatar} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '2px' }} />
+            ) : (
+              '👤'
+            )}
+          </div>
           <div className="user-info">
             <p className="username">{user?.username || 'OPERATOR'}</p>
-            <p className="level">LEVEL 4</p>
+            <p className="level">{user?.t212Connected ? '🟢 CONNECTED' : '⚠️ NOT CONNECTED'}</p>
           </div>
         </div>
-        <button className="logout-btn" onClick={() => { setToken(null); localStorage.removeItem('token'); }}>
+        <button 
+          className="settings-btn" 
+          onClick={() => setShowSettings(true)}
+          title="Settings"
+        >
+          <Settings size={18} />
+        </button>
+        <button 
+          className="logout-btn" 
+          onClick={() => { setToken(null); localStorage.removeItem('token'); }}
+        >
           <LogOut size={18} />
         </button>
       </div>
@@ -98,89 +173,104 @@ function App() {
         <div className="main-content">
           <header className="header">
             <h2>PORTFOLIO OVERVIEW</h2>
-            <p className="subtitle">STABLE ORBITAL LINK // QUANTUM TICKER ACTIVE</p>
+            <p className="subtitle">
+              {user?.t212Connected ? '🟢 TRADING212 CONNECTED' : '⚠️ CONNECT TRADING212 FOR REAL DATA'}
+            </p>
           </header>
 
-          <div className="stats-grid">
-            <div className="stat-card">
-              <p className="stat-label">TOTAL VALUE</p>
-              <h3>$1,284,592</h3>
-              <p className="stat-detail">+$12.5K DELTA</p>
-            </div>
-            <div className="stat-card">
-              <p className="stat-label">TODAY'S GAIN</p>
-              <h3 className="positive">+$12,847</h3>
-              <p className="stat-detail">+1.01% INDEX</p>
-            </div>
-            <div className="stat-card">
-              <p className="stat-label">ROI METRIC</p>
-              <h3 className="highlight">24.7%</h3>
-              <p className="stat-detail">ANNUAL RATE</p>
-            </div>
-            <div className="stat-card">
-              <p className="stat-label">HOLDINGS</p>
-              <h3>18 ASSETS</h3>
-              <p className="stat-detail">6 CRYPTO // 12 STOCKS</p>
-            </div>
-          </div>
+          {user?.t212Connected && loading && (
+            <div className="loading">Loading portfolio data...</div>
+          )}
 
-          <div className="portfolio-section">
-            <div className="holdings-container">
-              <h3>ACTIVE POSITIONS</h3>
-              <table className="holdings-table">
-                <thead>
-                  <tr>
-                    <th>TICKER</th>
-                    <th>QTY</th>
-                    <th>ENTRY</th>
-                    <th>CURRENT</th>
-                    <th>GAIN/LOSS</th>
-                    <th>% CHANGE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { ticker: 'AAPL', qty: 140, entry: 172.50, current: 189.84, gain: 2427.60, change: 2.25 },
-                    { ticker: 'NVDA', qty: 205, entry: 420.00, current: 875.12, gain: 93300, change: 108.3 },
-                    { ticker: 'MSFT', qty: 90, entry: 350.10, current: 415.50, gain: 5886, change: 18.68 },
-                    { ticker: 'TSLA', qty: 85, entry: 210.40, current: 197.20, gain: -1122, change: -6.28 },
-                    { ticker: 'AMZN', qty: 110, entry: 145.20, current: 178.15, gain: 3624.50, change: 22.69 },
-                  ].map((h, i) => (
-                    <tr key={i} className={h.change > 0 ? 'positive' : 'negative'}>
-                      <td className="ticker">{h.ticker}</td>
-                      <td>{h.qty}</td>
-                      <td>${h.entry}</td>
-                      <td>${h.current}</td>
-                      <td className={h.gain > 0 ? 'gain' : 'loss'}>${h.gain}</td>
-                      <td className={h.change > 0 ? 'gain-text' : 'loss-text'}>{h.change > 0 ? '+' : ''}{h.change}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="alerts-container">
-              <h3>MARKET ALERTS</h3>
-              <div className="alerts-list">
-                <div className="alert critical">
-                  <span className="alert-icon">⚡</span>
-                  <div>
-                    <p className="alert-title">CRITICAL</p>
-                    <p className="alert-text">FED RATIO ANALYSIS COMPLETE</p>
-                    <p className="alert-time">00:41</p>
-                  </div>
+          {user?.t212Connected ? (
+            <>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <p className="stat-label">TOTAL VALUE</p>
+                  <h3>${(stats.totalValue || 0).toFixed(2)}</h3>
+                  <p className="stat-detail">Real T212 Data</p>
                 </div>
-                <div className="alert warning">
-                  <span className="alert-icon">⚠️</span>
-                  <div>
-                    <p className="alert-title">VOLATILITY</p>
-                    <p className="alert-text">NVDA REACHED NEW HIGH</p>
-                    <p className="alert-time">10:15</p>
+                <div className="stat-card">
+                  <p className="stat-label">CASH BALANCE</p>
+                  <h3 className="positive">${(stats.cashBalance || 0).toFixed(2)}</h3>
+                  <p className="stat-detail">Available</p>
+                </div>
+                <div className="stat-card">
+                  <p className="stat-label">USED MARGIN</p>
+                  <h3 className="highlight">${(stats.usedMargin || 0).toFixed(2)}</h3>
+                  <p className="stat-detail">Invested</p>
+                </div>
+                <div className="stat-card">
+                  <p className="stat-label">HOLDINGS</p>
+                  <h3>{holdings.length} ASSETS</h3>
+                  <p className="stat-detail">From T212</p>
+                </div>
+              </div>
+
+              <div className="portfolio-section">
+                <div className="holdings-container">
+                  <h3>ACTIVE POSITIONS ({holdings.length})</h3>
+                  {holdings.length > 0 ? (
+                    <table className="holdings-table">
+                      <thead>
+                        <tr>
+                          <th>TICKER</th>
+                          <th>QTY</th>
+                          <th>VALUE</th>
+                          <th>STATUS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {holdings.map((h, i) => (
+                          <tr key={i}>
+                            <td className="ticker">{h.ticker || h.symbol || 'N/A'}</td>
+                            <td>{(h.quantity || h.qty || 0).toFixed(2)}</td>
+                            <td>${(h.value || h.currentPrice || 0).toFixed(2)}</td>
+                            <td className="positive">ACTIVE</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-message">No holdings yet</p>
+                  )}
+                </div>
+
+                <div className="alerts-container">
+                  <h3>STATUS</h3>
+                  <div className="alerts-list">
+                    <div className="alert critical">
+                      <span className="alert-icon">✅</span>
+                      <div>
+                        <p className="alert-title">CONNECTED</p>
+                        <p className="alert-text">Trading212 Account Linked</p>
+                        <p className="alert-time">Real-time</p>
+                      </div>
+                    </div>
+                    <div className="alert warning">
+                      <span className="alert-icon">ℹ️</span>
+                      <div>
+                        <p className="alert-title">INFO</p>
+                        <p className="alert-text">Data refreshes every 5 mins</p>
+                        <p className="alert-time">Auto</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+            </>
+          ) : (
+            <div className="no-connection">
+              <h3>⚠️ Trading212 Not Connected</h3>
+              <p>Connect your Trading212 account to see real portfolio data</p>
+              <button 
+                className="connect-btn" 
+                onClick={() => setShowSettings(true)}
+              >
+                CONNECT NOW
+              </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -254,34 +344,54 @@ function App() {
         <div className="main-content">
           <header className="header">
             <h2>ORDERS & POSITIONS</h2>
-            <p className="subtitle">EXECUTE COLD TICKER ORDER ENGINE</p>
+            <p className="subtitle">
+              {user?.t212Connected ? '🟢 LIVE ORDERS FROM TRADING212' : '⚠️ CONNECT T212 TO SEE ORDERS'}
+            </p>
           </header>
 
-          <div className="order-creation">
-            <h3>CREATE ORDER</h3>
-            <div className="order-form">
-              <input type="text" placeholder="NVDA" defaultValue="NVDA" className="symbol-input" />
-              <input type="number" placeholder="875.12" className="price-input" />
-              <input type="number" placeholder="50" className="qty-input" />
-              <button className="execute-btn">EXECUTE</button>
-            </div>
-          </div>
+          {user?.t212Connected ? (
+            <>
+              <div className="order-creation">
+                <h3>CREATE ORDER</h3>
+                <div className="order-form">
+                  <input type="text" placeholder="NVDA" defaultValue="NVDA" className="symbol-input" />
+                  <input type="number" placeholder="875.12" className="price-input" />
+                  <input type="number" placeholder="50" className="qty-input" />
+                  <button className="execute-btn">EXECUTE</button>
+                </div>
+              </div>
 
-          <div className="orders-section">
-            <h3>ACTIVE ORDERS</h3>
-            <div className="orders-grid">
-              <div className="order-item">
-                <p className="order-type buy">BUY</p>
-                <p>AAPL $189.00 x 100</p>
-                <p className="order-status">ACTIVE</p>
+              <div className="orders-section">
+                <h3>ACTIVE ORDERS ({orders.length})</h3>
+                {orders.length > 0 ? (
+                  <div className="orders-grid">
+                    {orders.map((order, i) => (
+                      <div key={i} className="order-item">
+                        <p className="order-type" style={{ background: order.side === 'BUY' ? 'rgba(0,255,136,0.2)' : 'rgba(255,0,85,0.2)', color: order.side === 'BUY' ? '#00ff88' : '#ff0055' }}>
+                          {order.side || 'PENDING'}
+                        </p>
+                        <p>{order.symbol || 'N/A'} @ ${(order.limitPrice || order.price || 0).toFixed(2)}</p>
+                        <p className="order-status">{order.status || 'ACTIVE'}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-message">No active orders</p>
+                )}
               </div>
-              <div className="order-item">
-                <p className="order-type sell">SELL</p>
-                <p>TSLA $198.50 x 40</p>
-                <p className="order-status">PARTIAL</p>
-              </div>
+            </>
+          ) : (
+            <div className="no-connection">
+              <h3>⚠️ Trading212 Not Connected</h3>
+              <p>Connect your Trading212 account to see real orders</p>
+              <button 
+                className="connect-btn" 
+                onClick={() => setShowSettings(true)}
+              >
+                CONNECT NOW
+              </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -290,18 +400,36 @@ function App() {
   if (page === 'ai') {
     const handleAiChat = async () => {
       if (!aiInput.trim()) return;
+      
       setAiChat([...aiChat, { role: 'user', text: aiInput }]);
+      const userMessage = aiInput;
       setAiInput('');
+
       try {
         const res = await fetch(`${BACKEND_URL}/ai/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: aiInput })
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ message: userMessage })
         });
         const data = await res.json();
-        setAiChat(prev => [...prev, { role: 'assistant', text: data.response || 'Service unavailable' }]);
+        
+        if (data.ok) {
+          setAiChat(prev => [...prev, { role: 'assistant', text: data.response }]);
+        } else {
+          setAiChat(prev => [...prev, { 
+            role: 'assistant', 
+            text: `Error: ${data.error || 'AI service error'}. Make sure GROQ_API_KEY is set in backend.` 
+          }]);
+        }
       } catch (err) {
-        setAiChat(prev => [...prev, { role: 'assistant', text: 'Error connecting' }]);
+        console.error('AI error:', err);
+        setAiChat(prev => [...prev, { 
+          role: 'assistant', 
+          text: 'Connection error. Make sure backend is running.' 
+        }]);
       }
     };
 
@@ -393,9 +521,11 @@ function App() {
 function LoginPage({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
       const res = await fetch(`${BACKEND_URL}/auth/login`, {
         method: 'POST',
@@ -406,10 +536,10 @@ function LoginPage({ onLogin }) {
       if (data.ok && data.token) {
         onLogin(data.token);
       } else {
-        alert(data.error);
+        setError(data.error || 'Login failed');
       }
     } catch (err) {
-      alert('Connection error');
+      setError('Connection error');
     }
   };
 
@@ -424,6 +554,8 @@ function LoginPage({ onLogin }) {
 
         <div className="security-protocol">SECURITY PROTOCOL: v3.45.9</div>
 
+        {error && <div className="error-message">{error}</div>}
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>EMAIL ADDRESS</label>
@@ -432,6 +564,7 @@ function LoginPage({ onLogin }) {
               placeholder="operator@screener.tech"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
             />
             <span className="sys-ok">SYS_OK</span>
           </div>
@@ -443,6 +576,7 @@ function LoginPage({ onLogin }) {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
             />
             <span className="sys-ok">SYS_OK</span>
           </div>
@@ -450,6 +584,7 @@ function LoginPage({ onLogin }) {
           <button type="submit" className="login-btn">INITIATE SYSTEM SESSION</button>
 
           <p className="terminal">TERMINAL: 01 A COLD LINK</p>
+          <p className="hint">Demo: inaamimran07@gmail.com / admin123</p>
         </form>
       </div>
     </div>
