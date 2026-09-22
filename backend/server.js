@@ -9,10 +9,25 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/stock-screener', {
+// MongoDB Connection with proper options for Render
+const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/stock-screener';
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+  maxPoolSize: 5,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+}).catch(err => {
+  console.error('❌ MongoDB connection error:', err.message);
+  process.exit(1);
+});
+
+mongoose.connection.on('connected', () => {
+  console.log('✅ MongoDB connected successfully');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('❌ MongoDB connection error:', err.message);
 });
 
 // User Schema with approval status
@@ -49,11 +64,6 @@ const initializeAdmin = async () => {
     console.error('Error initializing admin:', err.message);
   }
 };
-
-mongoose.connection.once('open', () => {
-  console.log('✅ MongoDB connected');
-  initializeAdmin();
-});
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -131,7 +141,6 @@ app.post('/api/auth/login', async (req, res) => {
       return res.json({ ok: false, error: 'Invalid credentials' });
     }
 
-    // Check approval status
     if (user.status === 'pending') {
       return res.json({ ok: false, error: 'Your account is pending admin approval' });
     }
@@ -536,5 +545,15 @@ app.get('/api/health', (req, res) => {
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 MongoDB: ${process.env.MONGODB_URI ? 'Connected' : 'Local'}`);
+  console.log(`📊 MongoDB: Connecting...`);
+  
+  // Try to initialize admin after connection is ready
+  setTimeout(initializeAdmin, 2000);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  mongoose.connection.close();
+  process.exit(0);
 });
