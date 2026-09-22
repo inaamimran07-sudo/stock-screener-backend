@@ -106,16 +106,22 @@ function App() {
       const fundData = await fundRes.json();
 
       if (stockData.ok && fundData.ok) {
+        const price = parseFloat(stockData.data?.price) || 0;
+        const change = parseFloat(stockData.data?.change) || 0;
+        const pe = parseFloat(fundData.fundamentals?.pe) || null;
+        const high52 = parseFloat(fundData.fundamentals?.52WeekHigh) || parseFloat(fundData.fundamentals?.highPrice52Week) || null;
+        const low52 = parseFloat(fundData.fundamentals?.52WeekLow) || parseFloat(fundData.fundamentals?.lowPrice52Week) || null;
+        
         setScreenerResults([{
           ticker: ticker,
-          price: stockData.data?.price || 0,
-          change: stockData.data?.change || 0,
-          changePercent: stockData.data?.changePercent || 0,
-          pe: fundData.fundamentals?.pe || 'N/A',
-          roe: 'N/A', // Finnhub doesn't always return ROE
+          price: price,
+          change: change,
+          changePercent: (change / price * 100) || 0,
+          pe: pe,
+          roe: 'N/A',
           score: Math.floor(Math.random() * 100),
-          high52: fundData.fundamentals?.highPrice52Week || 'N/A',
-          low52: fundData.fundamentals?.lowPrice52Week || 'N/A',
+          high52: high52,
+          low52: low52,
         }]);
       } else {
         setScreenerResults([]);
@@ -413,13 +419,13 @@ function App() {
                 {filteredResults.map((stock, i) => (
                   <tr key={i}>
                     <td className="ticker">{stock.ticker}</td>
-                    <td>${stock.price?.toFixed(2) || 'N/A'}</td>
+                    <td>${typeof stock.price === 'number' ? stock.price.toFixed(2) : 'N/A'}</td>
                     <td className={stock.change > 0 ? 'positive' : 'negative'}>
-                      {stock.change > 0 ? '+' : ''}{stock.change?.toFixed(2) || 0}%
+                      {stock.change > 0 ? '+' : ''}{typeof stock.change === 'number' ? stock.change.toFixed(2) : 'N/A'}%
                     </td>
-                    <td>{typeof stock.pe === 'number' ? stock.pe?.toFixed(2) : stock.pe}</td>
-                    <td>${typeof stock.high52 === 'number' ? stock.high52?.toFixed(2) : stock.high52}</td>
-                    <td>${typeof stock.low52 === 'number' ? stock.low52?.toFixed(2) : stock.low52}</td>
+                    <td>{typeof stock.pe === 'number' ? stock.pe.toFixed(2) : 'N/A'}</td>
+                    <td>${typeof stock.high52 === 'number' ? stock.high52.toFixed(2) : 'N/A'}</td>
+                    <td>${typeof stock.low52 === 'number' ? stock.low52.toFixed(2) : 'N/A'}</td>
                     <td className="score">{stock.score}</td>
                   </tr>
                 ))}
