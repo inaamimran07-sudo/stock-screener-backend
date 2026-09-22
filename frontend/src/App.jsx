@@ -36,6 +36,10 @@ function App() {
   const [gifs, setGifs] = useState([]);
   const [gifSearch, setGifSearch] = useState('');
 
+  // Admin data
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [adminAllUsers, setAdminAllUsers] = useState([]);
+
 
 
   const messagesEndRef = useRef(null);
@@ -107,6 +111,24 @@ function App() {
       if (data.ok) setMessages(data.messages || []);
     } catch (err) {
       console.error('Error fetching messages:', err);
+    }
+  }, [token]);
+
+  const fetchAdminData = useCallback(async () => {
+    try {
+      const pendingRes = await fetch(`${BACKEND_URL}/admin/pending-users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const pendingData = await pendingRes.json();
+      if (pendingData.ok) setPendingUsers(pendingData.users || []);
+
+      const allRes = await fetch(`${BACKEND_URL}/admin/all-users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const allData = await allRes.json();
+      if (allData.ok) setAdminAllUsers(allData.users || []);
+    } catch (err) {
+      console.error('Error fetching admin data:', err);
     }
   }, [token]);
 
@@ -191,6 +213,12 @@ function App() {
   }, [token, page, fetchAllUsers]);
 
   useEffect(() => {
+    if (token && user?.isAdmin && page === 'admin') {
+      fetchAdminData();
+    }
+  }, [token, user?.isAdmin, page, fetchAdminData]);
+
+  useEffect(() => {
     if (selectedUser) {
       fetchMessages(selectedUser.email);
       const interval = setInterval(() => fetchMessages(selectedUser.email), 2000);
@@ -249,6 +277,14 @@ function App() {
         >
           <MessageSquare size={18} /> AI ASSISTANT
         </button>
+        {user?.isAdmin && (
+          <button 
+            className={`nav-item ${page === 'admin' ? 'active' : ''}`}
+            onClick={() => setPage('admin')}
+          >
+            <Settings size={18} /> ADMIN
+          </button>
+        )}
       </nav>
 
       <div className="user-section">
@@ -912,6 +948,87 @@ function App() {
                 className="ai-input"
               />
               <button onClick={handleAiChat} className="send-btn"><Send size={18} /></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (page === 'admin' && user?.isAdmin) {
+    const handleApprove = async (userId) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/admin/approve/${userId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          fetchAdminData();
+        }
+      } catch (err) {
+        console.error('Error approving user:', err);
+      }
+    };
+
+    const handleDeny = async (userId) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/admin/deny/${userId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          fetchAdminData();
+        }
+      } catch (err) {
+        console.error('Error denying user:', err);
+      }
+    };
+
+    return (
+      <div className="app-container">
+        <Sidebar />
+        <div className="main-content">
+          <header className="header">
+            <h2>ADMIN CONTROLS</h2>
+            <p className="subtitle">SECURITY TERMINAL OVERRIDE</p>
+          </header>
+
+          <div className="admin-section">
+            <div className="pending-users">
+              <h3>PENDING USERS ({pendingUsers.length})</h3>
+              <div className="user-list">
+                {pendingUsers.length > 0 ? (
+                  pendingUsers.map(u => (
+                    <div key={u._id} className="user-item">
+                      <p>{u.email}</p>
+                      <p className="date">Requested: {new Date(u.createdAt).toLocaleDateString()}</p>
+                      <div className="actions">
+                        <button className="approve-btn" onClick={() => handleApprove(u._id)}>APPROVE</button>
+                        <button className="deny-btn" onClick={() => handleDeny(u._id)}>DENY</button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="empty-message">No pending users</p>
+                )}
+              </div>
+            </div>
+
+            <div className="verified-users">
+              <h3>ALL USERS ({adminAllUsers.length})</h3>
+              <div className="user-list">
+                {adminAllUsers.map(u => (
+                  <div key={u._id} className={`user-item ${u.status === 'approved' ? 'active' : ''}`}>
+                    <p>{u.email}</p>
+                    <p className="date">Status: {u.status.toUpperCase()}</p>
+                    <span className={u.status === 'approved' ? 'active-badge' : 'pending-badge'}>
+                      {u.status.toUpperCase()}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
