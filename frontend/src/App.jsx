@@ -241,7 +241,7 @@ function App() {
     } else {
       setPage('login');
     }
-  }, [token]);
+  }, [token, fetchUser]);
 
   useEffect(() => {
     if (token && user?.t212Connected && page === 'dashboard') {
