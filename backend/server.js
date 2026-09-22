@@ -7,16 +7,21 @@ const axios = require('axios');
 
 const app = express();
 
-// Enable CORS
-app.use(cors());
+// Enable CORS with proper headers
+app.use(cors({
+  origin: '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb' }));
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here_change_in_prod';
 const CLAUDE_API_KEY = process.env.ANTHROPIC_API_KEY;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY;
@@ -48,9 +53,9 @@ const messageSchema = new mongoose.Schema({
   fromEmail: String,
   toEmail: String,
   text: String,
-  image: String, // base64
+  image: String,
   gifUrl: String,
-  video: String, // base64 or URL
+  video: String,
   messageType: { type: String, enum: ['text', 'image', 'gif', 'video'], default: 'text' },
   createdAt: { type: Date, default: Date.now }
 });
@@ -60,15 +65,20 @@ const Message = mongoose.model('Message', messageSchema);
 
 // Create admin on startup
 const createAdminUser = async () => {
-  const existingAdmin = await User.findOne({ isAdmin: true });
-  if (!existingAdmin) {
-    await User.create({
-      email: 'inaamimran07@gmail.com',
-      password: 'admin123',
-      username: 'ADMIN',
-      isAdmin: true,
-      status: 'approved'
-    });
+  try {
+    const existingAdmin = await User.findOne({ isAdmin: true });
+    if (!existingAdmin) {
+      await User.create({
+        email: 'inaamimran07@gmail.com',
+        password: 'admin123',
+        username: 'ADMIN',
+        isAdmin: true,
+        status: 'approved'
+      });
+      console.log('Admin user created');
+    }
+  } catch (err) {
+    console.error('Error creating admin:', err);
   }
 };
 
@@ -96,7 +106,7 @@ app.post('/api/auth/signup', async (req, res) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ ok: false, error: 'User exists' });
     
-    const user = await User.create({ email, password, status: 'pending' });
+    await User.create({ email, password, status: 'pending' });
     res.json({ ok: true, message: 'Signup successful! Awaiting admin approval.' });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -124,6 +134,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/users/me', verifyToken, async (req, res) => {
   try {
     const user = await User.findOne({ email: req.user.email });
+    if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
     res.json({ ok: true, user });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -138,7 +149,8 @@ app.put('/api/users/profile', verifyToken, async (req, res) => {
       { username, avatar },
       { new: true }
     );
-    res.json({ ok: true, user });
+    if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+    res.json({ ok: true, user, message: 'Profile updated successfully' });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -147,12 +159,14 @@ app.put('/api/users/profile', verifyToken, async (req, res) => {
 app.post('/api/users/connect-t212', verifyToken, async (req, res) => {
   try {
     const { t212ApiKey } = req.body;
+    if (!t212ApiKey) return res.status(400).json({ ok: false, error: 'API key required' });
+    
     const user = await User.findOneAndUpdate(
       { email: req.user.email },
       { t212ApiKey, t212Connected: true },
       { new: true }
     );
-    res.json({ ok: true, user });
+    res.json({ ok: true, user, message: 'Trading212 connected successfully' });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -165,7 +179,7 @@ app.post('/api/users/disconnect-t212', verifyToken, async (req, res) => {
       { t212ApiKey: null, t212Connected: false },
       { new: true }
     );
-    res.json({ ok: true, user });
+    res.json({ ok: true, user, message: 'Trading212 disconnected' });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -252,7 +266,7 @@ app.get('/api/portfolio/holdings', verifyToken, async (req, res) => {
     });
     res.json({ ok: true, holdings: holdingsRes.data || [] });
   } catch (err) {
-    console.error('T212 error:', err.message);
+    console.error('T212 holdings error:', err.message);
     res.json({ ok: true, holdings: [] });
   }
 });
@@ -269,7 +283,7 @@ app.get('/api/portfolio/orders', verifyToken, async (req, res) => {
     });
     res.json({ ok: true, orders: ordersRes.data || [] });
   } catch (err) {
-    console.error('T212 error:', err.message);
+    console.error('T212 orders error:', err.message);
     res.json({ ok: true, orders: [] });
   }
 });
@@ -291,7 +305,7 @@ app.get('/api/portfolio/stats', verifyToken, async (req, res) => {
       usedMargin: (data.equity - data.cash) || 0
     }});
   } catch (err) {
-    console.error('T212 error:', err.message);
+    console.error('T212 stats error:', err.message);
     res.json({ ok: true, stats: { totalValue: 0, cashBalance: 0, usedMargin: 0 } });
   }
 });
