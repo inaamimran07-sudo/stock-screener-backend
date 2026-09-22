@@ -19,33 +19,7 @@ function App() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchUser = useCallback(async () => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/users/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.ok) setUser(data.user);
-    } catch (err) {
-      console.error('Error fetching user:', err);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (token) {
-      fetchUser();
-      setPage('dashboard');
-    }
-  }, [token, fetchUser]);
-
-  // Fetch portfolio data when user changes or T212 connects
-  useEffect(() => {
-    if (token && user?.t212Connected && page === 'dashboard') {
-      fetchPortfolioData();
-    }
-  }, [token, user?.t212Connected, page, fetchPortfolioData]);
-
-  const fetchPortfolioData = async () => {
+  const fetchPortfolioData = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch holdings
@@ -78,7 +52,33 @@ function App() {
       console.error('Error fetching portfolio data:', err);
     }
     setLoading(false);
-  };
+  }, [token]);
+
+  const fetchUser = useCallback(async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/users/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.ok) setUser(data.user);
+    } catch (err) {
+      console.error('Error fetching user:', err);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchUser();
+      setPage('dashboard');
+    }
+  }, [token, fetchUser]);
+
+  // Fetch portfolio data when user changes or T212 connects
+  useEffect(() => {
+    if (token && user?.t212Connected && page === 'dashboard') {
+      fetchPortfolioData();
+    }
+  }, [token, user?.t212Connected, page, fetchPortfolioData]);
 
   if (!token) {
     return <LoginPage onLogin={(t) => { setToken(t); localStorage.setItem('token', t); }} />;
