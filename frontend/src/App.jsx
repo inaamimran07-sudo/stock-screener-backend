@@ -505,17 +505,20 @@ function App() {
                       const fundData = await fundRes.json();
 
                       if (stockData.ok && fundData.ok) {
-                        const price = parseFloat(stockData.data?.price) || 0;
-                        const change = parseFloat(stockData.data?.change) || 0;
+                        // Twelve Data returns: close, change, percent_change, fifty_two_week_high, fifty_two_week_low
+                        const price = parseFloat(stockData.data?.close) || 0;
+                        const changePercent = parseFloat(stockData.data?.percent_change) || 0;
+                        
+                        // Finnhub returns: pe, h (52w high), l (52w low)
                         const pe = parseFloat(fundData.fundamentals?.pe) || null;
-                        const high52 = parseFloat(fundData.fundamentals?.['52WeekHigh'] || fundData.fundamentals?.highPrice52Week) || null;
-                        const low52 = parseFloat(fundData.fundamentals?.['52WeekLow'] || fundData.fundamentals?.lowPrice52Week) || null;
+                        const high52 = parseFloat(fundData.fundamentals?.h) || parseFloat(fundData.fundamentals?.['52WeekHigh']) || null;
+                        const low52 = parseFloat(fundData.fundamentals?.l) || parseFloat(fundData.fundamentals?.['52WeekLow']) || null;
                         
                         setScreenerResults([{
                           ticker: ticker,
                           price: price,
-                          change: change,
-                          changePercent: (change / price * 100) || 0,
+                          change: changePercent,
+                          changePercent: changePercent,
                           pe: pe,
                           roe: 'N/A',
                           score: Math.floor(Math.random() * 100),
@@ -553,17 +556,20 @@ function App() {
                       const fundData = await fundRes.json();
 
                       if (stockData.ok && fundData.ok) {
-                        const price = parseFloat(stockData.data?.price) || 0;
-                        const change = parseFloat(stockData.data?.change) || 0;
+                        // Twelve Data returns: close, change, percent_change, fifty_two_week_high, fifty_two_week_low
+                        const price = parseFloat(stockData.data?.close) || 0;
+                        const changePercent = parseFloat(stockData.data?.percent_change) || 0;
+                        
+                        // Finnhub returns: pe, h (52w high), l (52w low)
                         const pe = parseFloat(fundData.fundamentals?.pe) || null;
-                        const high52 = parseFloat(fundData.fundamentals?.['52WeekHigh'] || fundData.fundamentals?.highPrice52Week) || null;
-                        const low52 = parseFloat(fundData.fundamentals?.['52WeekLow'] || fundData.fundamentals?.lowPrice52Week) || null;
+                        const high52 = parseFloat(fundData.fundamentals?.h) || parseFloat(fundData.fundamentals?.['52WeekHigh']) || null;
+                        const low52 = parseFloat(fundData.fundamentals?.l) || parseFloat(fundData.fundamentals?.['52WeekLow']) || null;
                         
                         setScreenerResults([{
                           ticker: ticker,
                           price: price,
-                          change: change,
-                          changePercent: (change / price * 100) || 0,
+                          change: changePercent,
+                          changePercent: changePercent,
                           pe: pe,
                           roe: 'N/A',
                           score: Math.floor(Math.random() * 100),
