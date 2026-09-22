@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send } from 'lucide-react';
 import './App.css';
 
@@ -11,14 +11,7 @@ function App() {
   const [aiChat, setAiChat] = useState([]);
   const [aiInput, setAiInput] = useState('');
 
-  useEffect(() => {
-    if (token) {
-      fetchUser();
-      setPage('dashboard');
-    }
-  }, [token]);
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/users/me`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -28,7 +21,14 @@ function App() {
     } catch (err) {
       console.error('Error:', err);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchUser();
+      setPage('dashboard');
+    }
+  }, [token, fetchUser]);
 
   if (!token) {
     return <LoginPage onLogin={(t) => { setToken(t); localStorage.setItem('token', t); }} />;
