@@ -623,7 +623,7 @@ app.post('/api/ai/chat', authMiddleware, async (req, res) => {
     }
 
     const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      model: 'gemma2-9b-it',
+      model: 'openai/gpt-oss-20b',
       messages: [
         {
           role: 'system',
