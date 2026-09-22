@@ -349,6 +349,63 @@ app.post('/api/users/set-username', (req, res) => {
   res.json({ ok: true, message: 'Username set' });
 });
 
+// Profile Photo Upload
+app.post('/api/users/upload-avatar', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  const { avatar } = req.body; // Base64 encoded image
+  
+  if (!token) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
+  
+  const email = Buffer.from(token, 'base64').toString();
+  const user = users[email];
+  
+  if (!user) {
+    return res.status(404).json({ ok: false, error: 'User not found' });
+  }
+  
+  if (!avatar) {
+    return res.status(400).json({ ok: false, error: 'Avatar data required' });
+  }
+  
+  user.avatar = avatar;
+  res.json({ ok: true, message: 'Avatar uploaded', avatar: avatar });
+});
+
+// Wallpaper Upload
+app.post('/api/admin/wallpaper', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  const { wallpaper } = req.body; // Base64 encoded image
+  
+  if (!token) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
+  
+  const email = Buffer.from(token, 'base64').toString();
+  const user = users[email];
+  
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ ok: false, error: 'Admin only' });
+  }
+  
+  if (!wallpaper) {
+    return res.status(400).json({ ok: false, error: 'Wallpaper data required' });
+  }
+  
+  // Store wallpaper globally
+  stocks.wallpaper = wallpaper;
+  res.json({ ok: true, message: 'Wallpaper uploaded' });
+});
+
+// Get Wallpaper
+app.get('/api/admin/wallpaper', (req, res) => {
+  res.json({ 
+    ok: true, 
+    wallpaper: stocks.wallpaper || null 
+  });
+});
+
 // Admin - Pending Users
 app.get('/api/auth/pending-users', (req, res) => {
   const pending = Object.values(users).filter(u => !u.isApproved);
