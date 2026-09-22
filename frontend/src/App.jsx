@@ -43,7 +43,7 @@ function App() {
     if (token && user?.t212Connected && page === 'dashboard') {
       fetchPortfolioData();
     }
-  }, [token, user?.t212Connected, page]);
+  }, [token, user?.t212Connected, page, fetchPortfolioData]);
 
   const fetchPortfolioData = async () => {
     setLoading(true);
