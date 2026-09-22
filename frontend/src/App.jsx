@@ -109,8 +109,8 @@ function App() {
         const price = parseFloat(stockData.data?.price) || 0;
         const change = parseFloat(stockData.data?.change) || 0;
         const pe = parseFloat(fundData.fundamentals?.pe) || null;
-        const high52 = parseFloat(fundData.fundamentals?.52WeekHigh) || parseFloat(fundData.fundamentals?.highPrice52Week) || null;
-        const low52 = parseFloat(fundData.fundamentals?.52WeekLow) || parseFloat(fundData.fundamentals?.lowPrice52Week) || null;
+        const high52 = parseFloat(fundData.fundamentals?.['52WeekHigh'] || fundData.fundamentals?.highPrice52Week) || null;
+        const low52 = parseFloat(fundData.fundamentals?.['52WeekLow'] || fundData.fundamentals?.lowPrice52Week) || null;
         
         setScreenerResults([{
           ticker: ticker,
