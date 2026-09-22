@@ -1,10 +1,15 @@
 const express = require('express');
+const cors = require('cors');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const Anthropic = require('@anthropic-ai/sdk');
 const axios = require('axios');
 
 const app = express();
+
+// Enable CORS
+app.use(cors());
+
 app.use(express.json());
 
 // MongoDB Connection
