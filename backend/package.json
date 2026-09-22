@@ -7,12 +7,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": [
-    "stock",
-    "screener",
-    "trading",
-    "api"
-  ],
+  "keywords": ["stock", "screener", "trading", "api"],
   "author": "Inaam Imran",
   "license": "MIT",
   "dependencies": {
@@ -20,7 +15,8 @@
     "mongoose": "^7.0.0",
     "jsonwebtoken": "^9.0.0",
     "axios": "^1.4.0",
-    "@anthropic-ai/sdk": "^0.21.0"
+    "@anthropic-ai/sdk": "^0.21.0",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
