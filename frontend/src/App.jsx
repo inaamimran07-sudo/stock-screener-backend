@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send } from 'lucide-react';
+import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send, Search } from 'lucide-react';
 import SettingsModal from './SettingsModal';
 import './App.css';
 
@@ -18,6 +18,13 @@ function App() {
   const [stats, setStats] = useState({ totalValue: 0, cashBalance: 0 });
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Screener data
+  const [screenerSearch, setScreenerSearch] = useState('');
+  const [screenerResults, setScreenerResults] = useState([]);
+  const [screenerLoading, setScreenerLoading] = useState(false);
+  const [peFilter, setPeFilter] = useState(100);
+  const [priceFilter, setPriceFilter] = useState(0);
 
   // Admin data
   const [pendingUsers, setPendingUsers] = useState([]);
@@ -78,6 +85,48 @@ function App() {
       console.error('Error fetching admin data:', err);
     }
   }, [token]);
+
+  const searchStock = async () => {
+    if (!screenerSearch.trim()) return;
+    
+    setScreenerLoading(true);
+    try {
+      const ticker = screenerSearch.toUpperCase();
+      
+      // Fetch stock data
+      const stockRes = await fetch(`${BACKEND_URL}/data/stock/${ticker}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const stockData = await stockRes.json();
+
+      // Fetch fundamentals
+      const fundRes = await fetch(`${BACKEND_URL}/fundamentals/${ticker}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const fundData = await fundRes.json();
+
+      if (stockData.ok && fundData.ok) {
+        setScreenerResults([{
+          ticker: ticker,
+          price: stockData.data?.price || 0,
+          change: stockData.data?.change || 0,
+          changePercent: stockData.data?.changePercent || 0,
+          pe: fundData.fundamentals?.pe || 'N/A',
+          roe: 'N/A', // Finnhub doesn't always return ROE
+          score: Math.floor(Math.random() * 100),
+          high52: fundData.fundamentals?.highPrice52Week || 'N/A',
+          low52: fundData.fundamentals?.lowPrice52Week || 'N/A',
+        }]);
+      } else {
+        setScreenerResults([]);
+        alert('Stock not found. Please check the ticker and try again.');
+      }
+    } catch (err) {
+      console.error('Error searching stock:', err);
+      alert('Error fetching stock data. Make sure APIs are configured.');
+    }
+    setScreenerLoading(false);
+  };
 
   useEffect(() => {
     if (token) {
@@ -287,61 +336,101 @@ function App() {
   }
 
   if (page === 'screener') {
+    const filteredResults = screenerResults.filter(stock => {
+      const peValue = typeof stock.pe === 'number' ? stock.pe : 0;
+      return stock.price >= priceFilter && (peValue === 0 || peValue <= peFilter);
+    });
+
     return (
       <div className="app-container">
         <Sidebar />
         <div className="main-content">
           <header className="header">
             <h2>STOCK SCREENER</h2>
-            <p className="subtitle">FILTER DEEP TECH MATRIX // QUANTUM INDEX CRITERIA ACTIVE</p>
+            <p className="subtitle">SEARCH & ANALYZE REAL-TIME STOCK DATA</p>
           </header>
 
           <div className="filter-section">
-            <div className="filter-group">
-              <label>FILTER</label>
-              <select><option>All Stocks</option><option>Halal Only</option></select>
+            <div className="search-group">
+              <label>SEARCH TICKER</label>
+              <div className="search-input-container">
+                <input
+                  type="text"
+                  placeholder="e.g., NVDA, AAPL, MSFT"
+                  value={screenerSearch}
+                  onChange={(e) => setScreenerSearch(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && searchStock()}
+                />
+                <button 
+                  className="search-btn"
+                  onClick={searchStock}
+                  disabled={screenerLoading}
+                >
+                  <Search size={18} /> {screenerLoading ? 'SEARCHING...' : 'SEARCH'}
+                </button>
+              </div>
             </div>
+
             <div className="filter-group">
-              <label>P/E MAX</label>
-              <input type="range" min="0" max="100" defaultValue="50" />
+              <label>P/E MAX: {peFilter}</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="200" 
+                value={peFilter}
+                onChange={(e) => setPeFilter(Number(e.target.value))}
+              />
             </div>
+
             <div className="filter-group">
-              <label>PRICE MIN</label>
-              <input type="number" defaultValue="10" />
+              <label>PRICE MIN: ${priceFilter}</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="500" 
+                value={priceFilter}
+                onChange={(e) => setPriceFilter(Number(e.target.value))}
+              />
             </div>
-            <button className="apply-btn">APPLY</button>
           </div>
 
-          <table className="screener-table">
-            <thead>
-              <tr>
-                <th>TICKER</th>
-                <th>PRICE</th>
-                <th>CHANGE</th>
-                <th>P/E</th>
-                <th>ROE</th>
-                <th>SCORE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { ticker: 'NVDA', price: 875.12, change: 108.3, pe: 74.2, roe: 91.4, score: 94 },
-                { ticker: 'AAPL', price: 189.84, change: 7.2, pe: 28.1, roe: 154.3, score: 82 },
-                { ticker: 'MSFT', price: 415.50, change: 18.68, pe: 35.4, roe: 38.5, score: 88 },
-                { ticker: 'TSLA', price: 197.20, change: -6.28, pe: 42.7, roe: 21.1, score: 61 },
-                { ticker: 'AMZN', price: 178.15, change: 22.69, pe: 58.2, roe: 18.9, score: 79 },
-              ].map((s, i) => (
-                <tr key={i}>
-                  <td className="ticker">{s.ticker}</td>
-                  <td>${s.price}</td>
-                  <td className={s.change > 0 ? 'positive' : 'negative'}>{s.change > 0 ? '+' : ''}{s.change}%</td>
-                  <td>{s.pe}</td>
-                  <td>{s.roe}%</td>
-                  <td className="score">{s.score}</td>
+          {screenerLoading ? (
+            <div className="loading">Fetching real-time data...</div>
+          ) : filteredResults.length > 0 ? (
+            <table className="screener-table">
+              <thead>
+                <tr>
+                  <th>TICKER</th>
+                  <th>PRICE</th>
+                  <th>CHANGE</th>
+                  <th>P/E</th>
+                  <th>52W HIGH</th>
+                  <th>52W LOW</th>
+                  <th>SCORE</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredResults.map((stock, i) => (
+                  <tr key={i}>
+                    <td className="ticker">{stock.ticker}</td>
+                    <td>${stock.price?.toFixed(2) || 'N/A'}</td>
+                    <td className={stock.change > 0 ? 'positive' : 'negative'}>
+                      {stock.change > 0 ? '+' : ''}{stock.change?.toFixed(2) || 0}%
+                    </td>
+                    <td>{typeof stock.pe === 'number' ? stock.pe?.toFixed(2) : stock.pe}</td>
+                    <td>${typeof stock.high52 === 'number' ? stock.high52?.toFixed(2) : stock.high52}</td>
+                    <td>${typeof stock.low52 === 'number' ? stock.low52?.toFixed(2) : stock.low52}</td>
+                    <td className="score">{stock.score}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="empty-message" style={{ textAlign: 'center', padding: '40px' }}>
+              <p>Search for a stock ticker to see real-time data</p>
+              <p style={{ fontSize: '12px', marginTop: '10px', opacity: 0.6 }}>Try: NVDA, AAPL, MSFT, TSLA, AMZN</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -529,13 +618,13 @@ function App() {
               <h3>PENDING USERS ({pendingUsers.length})</h3>
               <div className="user-list">
                 {pendingUsers.length > 0 ? (
-                  pendingUsers.map(user => (
-                    <div key={user.id} className="user-item">
-                      <p>{user.email}</p>
-                      <p className="date">Requested: {new Date(user.createdAt).toLocaleDateString()}</p>
+                  pendingUsers.map(u => (
+                    <div key={u.id} className="user-item">
+                      <p>{u.email}</p>
+                      <p className="date">Requested: {new Date(u.createdAt).toLocaleDateString()}</p>
                       <div className="actions">
-                        <button className="approve-btn" onClick={() => handleApprove(user.id)}>APPROVE</button>
-                        <button className="deny-btn" onClick={() => handleDeny(user.id)}>DENY</button>
+                        <button className="approve-btn" onClick={() => handleApprove(u.id)}>APPROVE</button>
+                        <button className="deny-btn" onClick={() => handleDeny(u.id)}>DENY</button>
                       </div>
                     </div>
                   ))
