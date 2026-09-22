@@ -1,3 +1,4 @@
+// This is just to trigger - actual fix is creating App.jsx below
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
