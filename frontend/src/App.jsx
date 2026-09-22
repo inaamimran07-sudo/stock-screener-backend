@@ -19,35 +19,30 @@ function App() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Admin data
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+
   const fetchPortfolioData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch holdings
       const holdingsRes = await fetch(`${BACKEND_URL}/portfolio/holdings`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const holdingsData = await holdingsRes.json();
-      if (holdingsData.ok) {
-        setHoldings(holdingsData.holdings || []);
-      }
+      if (holdingsData.ok) setHoldings(holdingsData.holdings || []);
 
-      // Fetch stats
       const statsRes = await fetch(`${BACKEND_URL}/portfolio/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const statsData = await statsRes.json();
-      if (statsData.ok) {
-        setStats(statsData.stats || {});
-      }
+      if (statsData.ok) setStats(statsData.stats || {});
 
-      // Fetch orders
       const ordersRes = await fetch(`${BACKEND_URL}/portfolio/orders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const ordersData = await ordersRes.json();
-      if (ordersData.ok) {
-        setOrders(ordersData.orders || []);
-      }
+      if (ordersData.ok) setOrders(ordersData.orders || []);
     } catch (err) {
       console.error('Error fetching portfolio data:', err);
     }
@@ -66,6 +61,24 @@ function App() {
     }
   }, [token]);
 
+  const fetchAdminData = useCallback(async () => {
+    try {
+      const pendingRes = await fetch(`${BACKEND_URL}/admin/pending-users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const pendingData = await pendingRes.json();
+      if (pendingData.ok) setPendingUsers(pendingData.users || []);
+
+      const allRes = await fetch(`${BACKEND_URL}/admin/all-users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const allData = await allRes.json();
+      if (allData.ok) setAllUsers(allData.users || []);
+    } catch (err) {
+      console.error('Error fetching admin data:', err);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (token) {
       fetchUser();
@@ -73,15 +86,20 @@ function App() {
     }
   }, [token, fetchUser]);
 
-  // Fetch portfolio data when user changes or T212 connects
   useEffect(() => {
     if (token && user?.t212Connected && page === 'dashboard') {
       fetchPortfolioData();
     }
   }, [token, user?.t212Connected, page, fetchPortfolioData]);
 
+  useEffect(() => {
+    if (token && user?.isAdmin && page === 'admin') {
+      fetchAdminData();
+    }
+  }, [token, user?.isAdmin, page, fetchAdminData]);
+
   if (!token) {
-    return <LoginPage onLogin={(t) => { setToken(t); localStorage.setItem('token', t); }} />;
+    return <AuthPage onLogin={(t) => { setToken(t); localStorage.setItem('token', t); }} />;
   }
 
   if (showSettings) {
@@ -245,14 +263,6 @@ function App() {
                         <p className="alert-title">CONNECTED</p>
                         <p className="alert-text">Trading212 Account Linked</p>
                         <p className="alert-time">Real-time</p>
-                      </div>
-                    </div>
-                    <div className="alert warning">
-                      <span className="alert-icon">ℹ️</span>
-                      <div>
-                        <p className="alert-title">INFO</p>
-                        <p className="alert-text">Data refreshes every 5 mins</p>
-                        <p className="alert-time">Auto</p>
                       </div>
                     </div>
                   </div>
@@ -421,7 +431,7 @@ function App() {
         } else {
           setAiChat(prev => [...prev, { 
             role: 'assistant', 
-            text: `Error: ${data.error || 'AI service error'}. Make sure GROQ_API_KEY is set in backend.` 
+            text: `Error: ${data.error || 'AI service error'}` 
           }]);
         }
       } catch (err) {
@@ -475,6 +485,36 @@ function App() {
   }
 
   if (page === 'admin' && user?.isAdmin) {
+    const handleApprove = async (userId) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/admin/approve/${userId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          fetchAdminData();
+        }
+      } catch (err) {
+        console.error('Error approving user:', err);
+      }
+    };
+
+    const handleDeny = async (userId) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/admin/deny/${userId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          fetchAdminData();
+        }
+      } catch (err) {
+        console.error('Error denying user:', err);
+      }
+    };
+
     return (
       <div className="app-container">
         <Sidebar />
@@ -486,27 +526,37 @@ function App() {
 
           <div className="admin-section">
             <div className="pending-users">
-              <h3>PENDING USERS</h3>
+              <h3>PENDING USERS ({pendingUsers.length})</h3>
               <div className="user-list">
-                <div className="user-item">
-                  <p>alpha.dev@matrix.tech</p>
-                  <p className="date">Requested: 2025-01-25</p>
-                  <div className="actions">
-                    <button className="approve-btn">APPROVE</button>
-                    <button className="deny-btn">DENY</button>
-                  </div>
-                </div>
+                {pendingUsers.length > 0 ? (
+                  pendingUsers.map(user => (
+                    <div key={user.id} className="user-item">
+                      <p>{user.email}</p>
+                      <p className="date">Requested: {new Date(user.createdAt).toLocaleDateString()}</p>
+                      <div className="actions">
+                        <button className="approve-btn" onClick={() => handleApprove(user.id)}>APPROVE</button>
+                        <button className="deny-btn" onClick={() => handleDeny(user.id)}>DENY</button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="empty-message">No pending users</p>
+                )}
               </div>
             </div>
 
             <div className="verified-users">
-              <h3>VERIFIED OPERATORS</h3>
+              <h3>ALL USERS ({allUsers.length})</h3>
               <div className="user-list">
-                <div className="user-item active">
-                  <p>admin@screener.com</p>
-                  <p className="date">Verified: 2025-01-01</p>
-                  <span className="active-badge">ACTIVE</span>
-                </div>
+                {allUsers.map(u => (
+                  <div key={u.id} className={`user-item ${u.status === 'approved' ? 'active' : ''}`}>
+                    <p>{u.email}</p>
+                    <p className="date">Status: {u.status.toUpperCase()}</p>
+                    <span className={u.status === 'approved' ? 'active-badge' : 'pending-badge'}>
+                      {u.status.toUpperCase()}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -518,14 +568,18 @@ function App() {
   return null;
 }
 
-function LoginPage({ onLogin }) {
+function AuthPage({ onLogin }) {
+  const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     try {
       const res = await fetch(`${BACKEND_URL}/auth/login`, {
         method: 'POST',
@@ -537,6 +591,37 @@ function LoginPage({ onLogin }) {
         onLogin(data.token);
       } else {
         setError(data.error || 'Login failed');
+      }
+    } catch (err) {
+      setError('Connection error');
+    }
+  };
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setMessage('✅ ' + data.message);
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+        setTimeout(() => setIsSignup(false), 2000);
+      } else {
+        setError(data.error || 'Signup failed');
       }
     } catch (err) {
       setError('Connection error');
@@ -555,37 +640,87 @@ function LoginPage({ onLogin }) {
         <div className="security-protocol">SECURITY PROTOCOL: v3.45.9</div>
 
         {error && <div className="error-message">{error}</div>}
+        {message && <div className="success-message">{message}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>EMAIL ADDRESS</label>
-            <input
-              type="email"
-              placeholder="operator@screener.tech"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <span className="sys-ok">SYS_OK</span>
-          </div>
+        {!isSignup ? (
+          <form onSubmit={handleLogin}>
+            <div className="form-group">
+              <label>EMAIL ADDRESS</label>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <span className="sys-ok">SYS_OK</span>
+            </div>
 
-          <div className="form-group">
-            <label>PASSPHRASE DECRYPT</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <span className="sys-ok">SYS_OK</span>
-          </div>
+            <div className="form-group">
+              <label>PASSPHRASE DECRYPT</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <span className="sys-ok">SYS_OK</span>
+            </div>
 
-          <button type="submit" className="login-btn">INITIATE SYSTEM SESSION</button>
+            <button type="submit" className="login-btn">INITIATE SYSTEM SESSION</button>
 
-          <p className="terminal">TERMINAL: 01 A COLD LINK</p>
-          <p className="hint">Demo: inaamimran07@gmail.com / admin123</p>
-        </form>
+            <p className="terminal">TERMINAL: 01 A COLD LINK</p>
+            <p className="hint">
+              New user? <button type="button" className="link-btn" onClick={() => setIsSignup(true)}>SIGN UP HERE</button>
+            </p>
+          </form>
+        ) : (
+          <form onSubmit={handleSignup}>
+            <div className="form-group">
+              <label>EMAIL ADDRESS</label>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <span className="sys-ok">SYS_OK</span>
+            </div>
+
+            <div className="form-group">
+              <label>PASSWORD</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <span className="sys-ok">SYS_OK</span>
+            </div>
+
+            <div className="form-group">
+              <label>CONFIRM PASSWORD</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+              <span className="sys-ok">SYS_OK</span>
+            </div>
+
+            <button type="submit" className="login-btn">CREATE ACCOUNT</button>
+
+            <p className="terminal">TERMINAL: 01 A COLD LINK</p>
+            <p className="hint">
+              Already have account? <button type="button" className="link-btn" onClick={() => setIsSignup(false)}>LOGIN HERE</button>
+            </p>
+          </form>
+        )}
       </div>
     </div>
   );
