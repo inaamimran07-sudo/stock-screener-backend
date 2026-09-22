@@ -378,7 +378,7 @@ app.post('/api/ai/chat', verifyToken, async (req, res) => {
     }
 
     const response = await client.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
       system: 'You are an expert stock market analyst and financial advisor. Provide insightful, accurate information about stocks, trading strategies, and market trends. Be concise but informative.',
       messages: [
