@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send, Search } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send, Search, Image as ImageIcon, Smile, X } from 'lucide-react';
 import SettingsModal from './SettingsModal';
 import './App.css';
 
 const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const GIPHY_API_KEY = 'YOUR_GIPHY_KEY'; // Free tier: https://developers.giphy.com/
 
 function App() {
   const [page, setPage] = useState('login');
@@ -26,9 +27,28 @@ function App() {
   const [peFilter, setPeFilter] = useState(100);
   const [priceFilter, setPriceFilter] = useState(0);
 
+  // Messaging data
+  const [allUsers, setAllUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [messageInput, setMessageInput] = useState('');
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifs, setGifs] = useState([]);
+  const [gifSearch, setGifSearch] = useState('');
+
   // Admin data
   const [pendingUsers, setPendingUsers] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
+  const [adminAllUsers, setAdminAllUsers] = useState([]);
+
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const fetchPortfolioData = useCallback(async () => {
     setLoading(true);
@@ -68,70 +88,89 @@ function App() {
     }
   }, [token]);
 
-  const fetchAdminData = useCallback(async () => {
+  const fetchAllUsers = useCallback(async () => {
     try {
-      const pendingRes = await fetch(`${BACKEND_URL}/admin/pending-users`, {
+      const res = await fetch(`${BACKEND_URL}/users/all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const pendingData = await pendingRes.json();
-      if (pendingData.ok) setPendingUsers(pendingData.users || []);
-
-      const allRes = await fetch(`${BACKEND_URL}/admin/all-users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const allData = await allRes.json();
-      if (allData.ok) setAllUsers(allData.users || []);
+      const data = await res.json();
+      if (data.ok) setAllUsers(data.users.filter(u => u.email !== user?.email) || []);
     } catch (err) {
-      console.error('Error fetching admin data:', err);
+      console.error('Error fetching users:', err);
+    }
+  }, [token, user?.email]);
+
+  const fetchMessages = useCallback(async (otherEmail) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/messages/${otherEmail}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.ok) setMessages(data.messages || []);
+    } catch (err) {
+      console.error('Error fetching messages:', err);
     }
   }, [token]);
 
-  const searchStock = async () => {
-    if (!screenerSearch.trim()) return;
-    
-    setScreenerLoading(true);
+  const searchGifs = async (query) => {
+    if (!query.trim()) return;
     try {
-      const ticker = screenerSearch.toUpperCase();
-      
-      // Fetch stock data
-      const stockRes = await fetch(`${BACKEND_URL}/data/stock/${ticker}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const stockData = await stockRes.json();
+      const res = await fetch(
+        `https://api.giphy.com/v1/gifs/search?q=${query}&limit=10&api_key=${GIPHY_API_KEY}`
+      );
+      const data = await res.json();
+      setGifs(data.data || []);
+    } catch (err) {
+      console.error('Giphy error:', err);
+    }
+  };
 
-      // Fetch fundamentals
-      const fundRes = await fetch(`${BACKEND_URL}/fundamentals/${ticker}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const fundData = await fundRes.json();
+  const sendMessage = async (type = 'text', content = null) => {
+    if (!selectedUser) return;
+    if (type === 'text' && !messageInput.trim()) return;
 
-      if (stockData.ok && fundData.ok) {
-        const price = parseFloat(stockData.data?.price) || 0;
-        const change = parseFloat(stockData.data?.change) || 0;
-        const pe = parseFloat(fundData.fundamentals?.pe) || null;
-        const high52 = parseFloat(fundData.fundamentals?.['52WeekHigh'] || fundData.fundamentals?.highPrice52Week) || null;
-        const low52 = parseFloat(fundData.fundamentals?.['52WeekLow'] || fundData.fundamentals?.lowPrice52Week) || null;
-        
-        setScreenerResults([{
-          ticker: ticker,
-          price: price,
-          change: change,
-          changePercent: (change / price * 100) || 0,
-          pe: pe,
-          roe: 'N/A',
-          score: Math.floor(Math.random() * 100),
-          high52: high52,
-          low52: low52,
-        }]);
-      } else {
-        setScreenerResults([]);
-        alert('Stock not found. Please check the ticker and try again.');
+    try {
+      let payload = {
+        toEmail: selectedUser.email,
+        messageType: type
+      };
+
+      if (type === 'text') {
+        payload.text = messageInput;
+      } else if (type === 'image') {
+        payload.image = content;
+      } else if (type === 'gif') {
+        payload.gifUrl = content;
+      }
+
+      const res = await fetch(`${BACKEND_URL}/messages/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setMessageInput('');
+        setShowGifPicker(false);
+        fetchMessages(selectedUser.email);
       }
     } catch (err) {
-      console.error('Error searching stock:', err);
-      alert('Error fetching stock data. Make sure APIs are configured.');
+      console.error('Error sending message:', err);
     }
-    setScreenerLoading(false);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        sendMessage('image', event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   useEffect(() => {
@@ -148,10 +187,18 @@ function App() {
   }, [token, user?.t212Connected, page, fetchPortfolioData]);
 
   useEffect(() => {
-    if (token && user?.isAdmin && page === 'admin') {
-      fetchAdminData();
+    if (token && page === 'messages') {
+      fetchAllUsers();
     }
-  }, [token, user?.isAdmin, page, fetchAdminData]);
+  }, [token, page, fetchAllUsers]);
+
+  useEffect(() => {
+    if (selectedUser) {
+      fetchMessages(selectedUser.email);
+      const interval = setInterval(() => fetchMessages(selectedUser.email), 2000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedUser, token, fetchMessages]);
 
   if (!token) {
     return <AuthPage onLogin={(t) => { setToken(t); localStorage.setItem('token', t); }} />;
@@ -193,19 +240,17 @@ function App() {
           <TrendingUp size={18} /> ORDERS
         </button>
         <button 
+          className={`nav-item ${page === 'messages' ? 'active' : ''}`}
+          onClick={() => { setPage('messages'); setSelectedUser(null); }}
+        >
+          <MessageSquare size={18} /> MESSAGES
+        </button>
+        <button 
           className={`nav-item ${page === 'ai' ? 'active' : ''}`}
           onClick={() => setPage('ai')}
         >
           <MessageSquare size={18} /> AI ASSISTANT
         </button>
-        {user?.isAdmin && (
-          <button 
-            className={`nav-item ${page === 'admin' ? 'active' : ''}`}
-            onClick={() => setPage('admin')}
-          >
-            <Settings size={18} /> ADMIN
-          </button>
-        )}
       </nav>
 
       <div className="user-section">
@@ -365,11 +410,99 @@ function App() {
                   placeholder="e.g., NVDA, AAPL, MSFT"
                   value={screenerSearch}
                   onChange={(e) => setScreenerSearch(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && searchStock()}
+                  onKeyPress={(e) => e.key === 'Enter' && (() => {
+                    if (!screenerSearch.trim()) return;
+                    
+                    setScreenerLoading(true);
+                    const ticker = screenerSearch.toUpperCase();
+                    
+                    Promise.all([
+                      fetch(`${BACKEND_URL}/data/stock/${ticker}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      }),
+                      fetch(`${BACKEND_URL}/fundamentals/${ticker}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      })
+                    ]).then(async ([stockRes, fundRes]) => {
+                      const stockData = await stockRes.json();
+                      const fundData = await fundRes.json();
+
+                      if (stockData.ok && fundData.ok) {
+                        const price = parseFloat(stockData.data?.price) || 0;
+                        const change = parseFloat(stockData.data?.change) || 0;
+                        const pe = parseFloat(fundData.fundamentals?.pe) || null;
+                        const high52 = parseFloat(fundData.fundamentals?.['52WeekHigh'] || fundData.fundamentals?.highPrice52Week) || null;
+                        const low52 = parseFloat(fundData.fundamentals?.['52WeekLow'] || fundData.fundamentals?.lowPrice52Week) || null;
+                        
+                        setScreenerResults([{
+                          ticker: ticker,
+                          price: price,
+                          change: change,
+                          changePercent: (change / price * 100) || 0,
+                          pe: pe,
+                          roe: 'N/A',
+                          score: Math.floor(Math.random() * 100),
+                          high52: high52,
+                          low52: low52,
+                        }]);
+                      } else {
+                        setScreenerResults([]);
+                        alert('Stock not found.');
+                      }
+                      setScreenerLoading(false);
+                    }).catch(err => {
+                      console.error('Error:', err);
+                      setScreenerLoading(false);
+                    });
+                  })()}
                 />
                 <button 
                   className="search-btn"
-                  onClick={searchStock}
+                  onClick={() => {
+                    if (!screenerSearch.trim()) return;
+                    
+                    setScreenerLoading(true);
+                    const ticker = screenerSearch.toUpperCase();
+                    
+                    Promise.all([
+                      fetch(`${BACKEND_URL}/data/stock/${ticker}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      }),
+                      fetch(`${BACKEND_URL}/fundamentals/${ticker}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      })
+                    ]).then(async ([stockRes, fundRes]) => {
+                      const stockData = await stockRes.json();
+                      const fundData = await fundRes.json();
+
+                      if (stockData.ok && fundData.ok) {
+                        const price = parseFloat(stockData.data?.price) || 0;
+                        const change = parseFloat(stockData.data?.change) || 0;
+                        const pe = parseFloat(fundData.fundamentals?.pe) || null;
+                        const high52 = parseFloat(fundData.fundamentals?.['52WeekHigh'] || fundData.fundamentals?.highPrice52Week) || null;
+                        const low52 = parseFloat(fundData.fundamentals?.['52WeekLow'] || fundData.fundamentals?.lowPrice52Week) || null;
+                        
+                        setScreenerResults([{
+                          ticker: ticker,
+                          price: price,
+                          change: change,
+                          changePercent: (change / price * 100) || 0,
+                          pe: pe,
+                          roe: 'N/A',
+                          score: Math.floor(Math.random() * 100),
+                          high52: high52,
+                          low52: low52,
+                        }]);
+                      } else {
+                        setScreenerResults([]);
+                        alert('Stock not found.');
+                      }
+                      setScreenerLoading(false);
+                    }).catch(err => {
+                      console.error('Error:', err);
+                      setScreenerLoading(false);
+                    });
+                  }}
                   disabled={screenerLoading}
                 >
                   <Search size={18} /> {screenerLoading ? 'SEARCHING...' : 'SEARCH'}
@@ -437,6 +570,215 @@ function App() {
               <p style={{ fontSize: '12px', marginTop: '10px', opacity: 0.6 }}>Try: NVDA, AAPL, MSFT, TSLA, AMZN</p>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (page === 'messages') {
+    return (
+      <div className="app-container">
+        <Sidebar />
+        <div className="main-content">
+          <header className="header">
+            <h2>MESSAGING</h2>
+            <p className="subtitle">CHAT WITH OTHER USERS</p>
+          </header>
+
+          <div className="messaging-container" style={{ display: 'flex', gap: '20px', height: 'calc(100vh - 200px)' }}>
+            {/* Users List */}
+            <div style={{ flex: '0 0 250px', borderRight: '1px solid #00ff88', overflowY: 'auto', paddingRight: '15px' }}>
+              <h3 style={{ color: '#00ff88', marginBottom: '15px' }}>USERS ONLINE</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {allUsers.map(u => (
+                  <button
+                    key={u.email}
+                    onClick={() => setSelectedUser(u)}
+                    style={{
+                      padding: '10px',
+                      border: selectedUser?.email === u.email ? '2px solid #00ff88' : '1px solid #00ff8844',
+                      background: selectedUser?.email === u.email ? 'rgba(0,255,136,0.1)' : 'transparent',
+                      color: '#00ff88',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      borderRadius: '2px',
+                      fontSize: '12px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>{u.username || u.email}</div>
+                    <div style={{ fontSize: '10px', opacity: 0.7 }}>{u.email}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Chat Area */}
+            {selectedUser ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={{ borderBottom: '1px solid #00ff8844', paddingBottom: '10px' }}>
+                  <h3 style={{ color: '#00ff88' }}>{selectedUser.username || selectedUser.email}</h3>
+                </div>
+
+                {/* Messages */}
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {messages.map((msg, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        textAlign: msg.fromEmail === user.email ? 'right' : 'left',
+                        marginBottom: '10px'
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'inline-block',
+                          maxWidth: '60%',
+                          padding: '10px 15px',
+                          borderRadius: '4px',
+                          background: msg.fromEmail === user.email ? 'rgba(0,255,136,0.2)' : 'rgba(255,0,85,0.2)',
+                          border: `1px solid ${msg.fromEmail === user.email ? '#00ff88' : '#ff0055'}`,
+                          color: msg.fromEmail === user.email ? '#00ff88' : '#ff0055',
+                          fontSize: '13px',
+                          wordBreak: 'break-word'
+                        }}
+                      >
+                        {msg.messageType === 'text' && <p>{msg.text}</p>}
+                        {msg.messageType === 'image' && <img src={msg.image} alt="shared" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '2px' }} />}
+                        {msg.messageType === 'gif' && <img src={msg.gifUrl} alt="gif" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '2px' }} />}
+                        <p style={{ fontSize: '10px', opacity: 0.7, marginTop: '5px' }}>
+                          {new Date(msg.createdAt).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* GIF Picker Modal */}
+                {showGifPicker && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '150px',
+                    right: '50px',
+                    background: '#0a0e27',
+                    border: '1px solid #00ff88',
+                    borderRadius: '4px',
+                    padding: '10px',
+                    zIndex: 100,
+                    width: '300px'
+                  }}>
+                    <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search GIFs..."
+                        value={gifSearch}
+                        onChange={(e) => setGifSearch(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && searchGifs(gifSearch)}
+                        style={{
+                          flex: 1,
+                          padding: '5px',
+                          background: '#00ff8811',
+                          border: '1px solid #00ff88',
+                          color: '#00ff88',
+                          borderRadius: '2px'
+                        }}
+                      />
+                      <button
+                        onClick={() => searchGifs(gifSearch)}
+                        style={{
+                          padding: '5px 10px',
+                          background: '#00ff88',
+                          color: '#000',
+                          border: 'none',
+                          borderRadius: '2px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Search
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                      {gifs.map(gif => (
+                        <button
+                          key={gif.id}
+                          onClick={() => {
+                            sendMessage('gif', gif.images.fixed_height.url);
+                          }}
+                          style={{
+                            border: 'none',
+                            cursor: 'pointer',
+                            borderRadius: '2px',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <img src={gif.images.fixed_height.url} alt="gif" style={{ width: '100%', height: 'auto' }} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Message Input */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Type message..."
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendMessage('text')}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      background: '#00ff8811',
+                      border: '1px solid #00ff88',
+                      color: '#00ff88',
+                      borderRadius: '2px'
+                    }}
+                  />
+                  <label style={{ cursor: 'pointer', color: '#00ff88' }}>
+                    <ImageIcon size={18} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  <button
+                    onClick={() => setShowGifPicker(!showGifPicker)}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(0,255,136,0.2)',
+                      border: '1px solid #00ff88',
+                      color: '#00ff88',
+                      cursor: 'pointer',
+                      borderRadius: '2px'
+                    }}
+                  >
+                    <Smile size={18} />
+                  </button>
+                  <button
+                    onClick={() => sendMessage('text')}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#00ff88',
+                      color: '#000',
+                      border: 'none',
+                      cursor: 'pointer',
+                      borderRadius: '2px'
+                    }}
+                  >
+                    <Send size={18} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <p style={{ color: '#00ff8844' }}>Select a user to start messaging</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -544,15 +886,15 @@ function App() {
         <div className="main-content">
           <header className="header">
             <h2>AI MARKET ANALYST</h2>
-            <p className="subtitle">INTELLIGENT PORTFOLIO OVERVIEW</p>
+            <p className="subtitle">INTELLIGENT PORTFOLIO OVERVIEW (CLAUDE 3.5)</p>
           </header>
 
           <div className="ai-chat-container">
             <div className="chat-messages">
               {aiChat.length === 0 ? (
                 <div className="welcome-message">
-                  <h3>AI Assistant Ready</h3>
-                  <p>Ask about stocks, portfolio, or market trends</p>
+                  <h3>Claude 3.5 Sonnet Ready</h3>
+                  <p>Ask about stocks, portfolio, or market trends. Now with Claude AI for better insights!</p>
                 </div>
               ) : (
                 aiChat.map((msg, i) => (
@@ -572,87 +914,6 @@ function App() {
                 className="ai-input"
               />
               <button onClick={handleAiChat} className="send-btn"><Send size={18} /></button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (page === 'admin' && user?.isAdmin) {
-    const handleApprove = async (userId) => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/admin/approve/${userId}`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (data.ok) {
-          fetchAdminData();
-        }
-      } catch (err) {
-        console.error('Error approving user:', err);
-      }
-    };
-
-    const handleDeny = async (userId) => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/admin/deny/${userId}`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (data.ok) {
-          fetchAdminData();
-        }
-      } catch (err) {
-        console.error('Error denying user:', err);
-      }
-    };
-
-    return (
-      <div className="app-container">
-        <Sidebar />
-        <div className="main-content">
-          <header className="header">
-            <h2>ADMIN CONTROLS</h2>
-            <p className="subtitle">SECURITY TERMINAL OVERRIDE</p>
-          </header>
-
-          <div className="admin-section">
-            <div className="pending-users">
-              <h3>PENDING USERS ({pendingUsers.length})</h3>
-              <div className="user-list">
-                {pendingUsers.length > 0 ? (
-                  pendingUsers.map(u => (
-                    <div key={u.id} className="user-item">
-                      <p>{u.email}</p>
-                      <p className="date">Requested: {new Date(u.createdAt).toLocaleDateString()}</p>
-                      <div className="actions">
-                        <button className="approve-btn" onClick={() => handleApprove(u.id)}>APPROVE</button>
-                        <button className="deny-btn" onClick={() => handleDeny(u.id)}>DENY</button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="empty-message">No pending users</p>
-                )}
-              </div>
-            </div>
-
-            <div className="verified-users">
-              <h3>ALL USERS ({allUsers.length})</h3>
-              <div className="user-list">
-                {allUsers.map(u => (
-                  <div key={u.id} className={`user-item ${u.status === 'approved' ? 'active' : ''}`}>
-                    <p>{u.email}</p>
-                    <p className="date">Status: {u.status.toUpperCase()}</p>
-                    <span className={u.status === 'approved' ? 'active-badge' : 'pending-badge'}>
-                      {u.status.toUpperCase()}
-                    </span>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>
