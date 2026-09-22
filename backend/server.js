@@ -15,7 +15,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/stock-scr
   useUnifiedTopology: true,
 });
 
-// User Schema
+// User Schema with approval status
 const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
@@ -24,6 +24,7 @@ const userSchema = new mongoose.Schema({
   t212ApiKey: { type: String, default: null },
   t212Connected: { type: Boolean, default: false },
   isAdmin: { type: Boolean, default: false },
+  status: { type: String, enum: ['pending', 'approved', 'denied'], default: 'pending' },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -39,24 +40,13 @@ const initializeAdmin = async () => {
         password: 'admin123',
         username: 'ADMIN',
         isAdmin: true,
+        status: 'approved',
         t212Connected: false,
       });
       console.log('✅ Admin user created');
     }
-
-    const testExists = await User.findOne({ email: 'test@example.com' });
-    if (!testExists) {
-      await User.create({
-        email: 'test@example.com',
-        password: 'test123',
-        username: 'TEST_USER',
-        isAdmin: false,
-        t212Connected: false,
-      });
-      console.log('✅ Test user created');
-    }
   } catch (err) {
-    console.error('Error initializing users:', err.message);
+    console.error('Error initializing admin:', err.message);
   }
 };
 
@@ -82,7 +72,56 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+const adminMiddleware = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.json({ ok: false, error: 'No token' });
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user?.isAdmin) return res.json({ ok: false, error: 'Admin only' });
+    req.userId = decoded.id;
+    next();
+  } catch (err) {
+    res.json({ ok: false, error: 'Unauthorized' });
+  }
+};
+
 // ============ AUTH ============
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.json({ ok: false, error: 'Email and password required' });
+    }
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.json({ ok: false, error: 'Email already exists' });
+    }
+
+    const newUser = await User.create({
+      email,
+      password,
+      username: email.split('@')[0],
+      status: 'pending',
+      isAdmin: false,
+    });
+
+    res.json({
+      ok: true,
+      message: 'Signup successful! Waiting for admin approval.',
+      user: {
+        id: newUser._id,
+        email: newUser.email,
+        status: newUser.status,
+      },
+    });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -90,6 +129,15 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (!user || user.password !== password) {
       return res.json({ ok: false, error: 'Invalid credentials' });
+    }
+
+    // Check approval status
+    if (user.status === 'pending') {
+      return res.json({ ok: false, error: 'Your account is pending admin approval' });
+    }
+
+    if (user.status === 'denied') {
+      return res.json({ ok: false, error: 'Your account has been denied' });
     }
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET);
@@ -214,6 +262,86 @@ app.post('/api/users/disconnect-t212', authMiddleware, async (req, res) => {
   }
 });
 
+// ============ ADMIN ============
+app.get('/api/admin/pending-users', adminMiddleware, async (req, res) => {
+  try {
+    const pending = await User.find({ status: 'pending' });
+    res.json({
+      ok: true,
+      users: pending.map(u => ({
+        id: u._id,
+        email: u.email,
+        username: u.username,
+        createdAt: u.createdAt,
+      })),
+    });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/admin/all-users', adminMiddleware, async (req, res) => {
+  try {
+    const all = await User.find({});
+    res.json({
+      ok: true,
+      users: all.map(u => ({
+        id: u._id,
+        email: u.email,
+        username: u.username,
+        status: u.status,
+        createdAt: u.createdAt,
+      })),
+    });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/admin/approve/:userId', adminMiddleware, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.userId,
+      { status: 'approved' },
+      { new: true }
+    );
+
+    res.json({
+      ok: true,
+      message: `${user.email} approved`,
+      user: {
+        id: user._id,
+        email: user.email,
+        status: user.status,
+      },
+    });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/admin/deny/:userId', adminMiddleware, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.userId,
+      { status: 'denied' },
+      { new: true }
+    );
+
+    res.json({
+      ok: true,
+      message: `${user.email} denied`,
+      user: {
+        id: user._id,
+        email: user.email,
+        status: user.status,
+      },
+    });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 // ============ PORTFOLIO (T212) ============
 app.get('/api/portfolio/holdings', authMiddleware, async (req, res) => {
   try {
@@ -275,8 +403,8 @@ app.get('/api/portfolio/orders', authMiddleware, async (req, res) => {
           quantity: o.quantity,
           price: o.limitPrice || o.filledPrice,
           limitPrice: o.limitPrice,
-          side: o.side, // BUY or SELL
-          status: o.status, // ACTIVE, FILLED, etc
+          side: o.side,
+          status: o.status,
         })) || [],
       });
     } catch (err) {
