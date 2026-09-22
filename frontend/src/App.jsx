@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send, Search, Image as ImageIcon, Smile, X } from 'lucide-react';
+import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send, Search, Image as ImageIcon, Smile } from 'lucide-react';
 import SettingsModal from './SettingsModal';
 import './App.css';
 
@@ -36,9 +36,7 @@ function App() {
   const [gifs, setGifs] = useState([]);
   const [gifSearch, setGifSearch] = useState('');
 
-  // Admin data
-  const [pendingUsers, setPendingUsers] = useState([]);
-  const [adminAllUsers, setAdminAllUsers] = useState([]);
+
 
   const messagesEndRef = useRef(null);
 
