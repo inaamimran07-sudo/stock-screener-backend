@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send, Search, Image as ImageIcon, Smile } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LineChart, TrendingUp, BarChart3, MessageSquare, Settings, LogOut, Send, Search } from 'lucide-react';
 import SettingsModal from './SettingsModal';
 import './App.css';
 
 const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
-const GIPHY_API_KEY = 'YOUR_GIPHY_KEY'; // Free tier: https://developers.giphy.com/
 
 function App() {
   const [page, setPage] = useState('login');
@@ -21,7 +20,6 @@ function App() {
   const [screenerCache, setScreenerCache] = useState({});
   const [peFilter, setPeFilter] = useState(50);
   const [priceFilter, setPriceFilter] = useState(0);
-  const [selectedStock, setSelectedStock] = useState(null);
   const [orderModal, setOrderModal] = useState(false);
   const [orderData, setOrderData] = useState({ ticker: '', quantity: 0, direction: 'BUY', orderType: 'MARKET' });
   
@@ -29,9 +27,6 @@ function App() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [messageInput, setMessageInput] = useState('');
   const [messages, setMessages] = useState([]);
-  const [gifModal, setGifModal] = useState(false);
-  const [gifs, setGifs] = useState([]);
-  const [imageFile, setImageFile] = useState(null);
   const [profileZoom, setProfileZoom] = useState({});
   
   // AI Chat State
@@ -311,7 +306,6 @@ function App() {
                     
                     if (screenerCache[ticker]) {
                       setScreenerResults([screenerCache[ticker]]);
-                      setSelectedStock(screenerCache[ticker]);
                       return;
                     }
                     
@@ -349,7 +343,6 @@ function App() {
                         
                         setScreenerResults([stock]);
                         setScreenerCache(prev => ({ ...prev, [ticker]: stock }));
-                        setSelectedStock(stock);
                       } else {
                         setScreenerResults([]);
                         alert('Stock not found.');
@@ -372,7 +365,6 @@ function App() {
                     
                     if (screenerCache[ticker]) {
                       setScreenerResults([screenerCache[ticker]]);
-                      setSelectedStock(screenerCache[ticker]);
                       return;
                     }
                     
@@ -410,7 +402,6 @@ function App() {
                         
                         setScreenerResults([stock]);
                         setScreenerCache(prev => ({ ...prev, [ticker]: stock }));
-                        setSelectedStock(stock);
                       } else {
                         setScreenerResults([]);
                         alert('Stock not found.');
@@ -466,7 +457,7 @@ function App() {
                 </thead>
                 <tbody>
                   {filteredResults.map((stock, i) => (
-                    <tr key={i} onClick={() => setSelectedStock(stock)} style={{ cursor: 'pointer' }}>
+                    <tr key={i} style={{ cursor: 'pointer' }}>
                       <td className="ticker">{stock.ticker}</td>
                       <td>${typeof stock.price === 'number' ? stock.price.toFixed(2) : 'N/A'}</td>
                       <td className={stock.change > 0 ? 'positive' : 'negative'}>
