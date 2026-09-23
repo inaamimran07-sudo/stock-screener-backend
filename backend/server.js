@@ -16,7 +16,7 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -28,12 +28,18 @@ const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY;
 
 const client = new Anthropic();
 
+// MongoDB Connection with proper logging
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
-}).catch(err => console.error('MongoDB connection error:', err));
+})
+.then(() => console.log('✅ Connected to MongoDB Atlas'))
+.catch(err => {
+  console.error('❌ MongoDB connection error:', err.message);
+  console.error('MONGODB_URI:', MONGODB_URI ? 'SET' : 'NOT SET');
+});
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -75,10 +81,12 @@ const createAdminUser = async () => {
         isAdmin: true,
         status: 'approved'
       });
-      console.log('Admin user created');
+      console.log('✅ Admin user created');
+    } else {
+      console.log('✅ Admin user already exists');
     }
   } catch (err) {
-    console.error('Error creating admin:', err);
+    console.error('❌ Error creating admin:', err);
   }
 };
 
