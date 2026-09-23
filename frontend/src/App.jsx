@@ -1070,8 +1070,8 @@ function App() {
               <p className="subtitle">INTELLIGENT PORTFOLIO OVERVIEW (CLAUDE 3.5)</p>
             </header>
 
-          <div className="ai-chat-container">
-            <div className="chat-messages">
+            <div className="ai-chat-container">
+              <div className="chat-messages">
               {aiChat.length === 0 ? (
                 <div className="welcome-message">
                   <h3>Claude 3.5 Sonnet Ready</h3>
@@ -1095,6 +1095,7 @@ function App() {
                 className="ai-input"
               />
               <button onClick={handleAiChat} className="send-btn"><Send size={18} /></button>
+            </div>
             </div>
           </div>
         </div>
