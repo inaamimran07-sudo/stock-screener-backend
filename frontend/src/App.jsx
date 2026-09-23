@@ -1098,6 +1098,7 @@ function App() {
             </div>
           </div>
         </div>
+      </div>
 
       {/* ORDER EXECUTION MODAL */}
       {orderModal && (
