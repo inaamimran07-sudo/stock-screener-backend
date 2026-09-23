@@ -1070,8 +1070,8 @@ function App() {
               <p className="subtitle">INTELLIGENT PORTFOLIO OVERVIEW (CLAUDE 3.5)</p>
             </header>
 
-            <div className="ai-chat-container">
-              <div className="chat-messages">
+          <div className="ai-chat-container">
+            <div className="chat-messages">
               {aiChat.length === 0 ? (
                 <div className="welcome-message">
                   <h3>Claude 3.5 Sonnet Ready</h3>
@@ -1096,98 +1096,8 @@ function App() {
               />
               <button onClick={handleAiChat} className="send-btn"><Send size={18} /></button>
             </div>
-            </div>
           </div>
         </div>
-      </>
-    );
-  }
-
-  if (page === 'admin' && user?.isAdmin) {
-    const handleApprove = async (userId) => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/admin/approve/${userId}`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (data.ok) {
-          fetchAdminData();
-        }
-      } catch (err) {
-        console.error('Error approving user:', err);
-      }
-    };
-
-    const handleDeny = async (userId) => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/admin/deny/${userId}`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (data.ok) {
-          fetchAdminData();
-        }
-      } catch (err) {
-        console.error('Error denying user:', err);
-      }
-    };
-
-    return (
-      <div className="app-container">
-        <Sidebar />
-        <div className="main-content">
-          <header className="header">
-            <h2>ADMIN CONTROLS</h2>
-            <p className="subtitle">SECURITY TERMINAL OVERRIDE</p>
-          </header>
-
-          <div className="admin-section">
-            <div className="pending-users">
-              <h3>PENDING USERS ({pendingUsers.length})</h3>
-              <div className="user-list">
-                {pendingUsers.length > 0 ? (
-                  pendingUsers.map(u => (
-                    <div key={u._id} className="user-item">
-                      <p>{u.email}</p>
-                      <p className="date">Requested: {new Date(u.createdAt).toLocaleDateString()}</p>
-                      <div className="actions">
-                        <button className="approve-btn" onClick={() => handleApprove(u._id)}>APPROVE</button>
-                        <button className="deny-btn" onClick={() => handleDeny(u._id)}>DENY</button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="empty-message">No pending users</p>
-                )}
-              </div>
-            </div>
-
-            <div className="verified-users">
-              <h3>ALL USERS ({adminAllUsers.length})</h3>
-              <div className="user-list">
-                {adminAllUsers.map(u => (
-                  <div key={u._id} className={`user-item ${u.status === 'approved' ? 'active' : ''}`}>
-                    <p>{u.email}</p>
-                    <p className="date">Status: {u.status.toUpperCase()}</p>
-                    <span className={u.status === 'approved' ? 'active-badge' : 'pending-badge'}>
-                      {u.status.toUpperCase()}
-                    </span>
-                    <button 
-                      className="edit-btn"
-                      onClick={() => {
-                        setAdminEditUser(u);
-                        setAdminEditData({ username: u.username || 'OPERATOR', avatar: u.avatar || null });
-                      }}
-                    >EDIT</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* ORDER EXECUTION MODAL */}
       {orderModal && (
@@ -1296,6 +1206,96 @@ function App() {
           </div>
         </div>
       )}
+      </>
+    );
+  }
+
+  if (page === 'admin' && user?.isAdmin) {
+    const handleApprove = async (userId) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/admin/approve/${userId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          fetchAdminData();
+        }
+      } catch (err) {
+        console.error('Error approving user:', err);
+      }
+    };
+
+    const handleDeny = async (userId) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/admin/deny/${userId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          fetchAdminData();
+        }
+      } catch (err) {
+        console.error('Error denying user:', err);
+      }
+    };
+
+    return (
+      <div className="app-container">
+        <Sidebar />
+        <div className="main-content">
+          <header className="header">
+            <h2>ADMIN CONTROLS</h2>
+            <p className="subtitle">SECURITY TERMINAL OVERRIDE</p>
+          </header>
+
+          <div className="admin-section">
+            <div className="pending-users">
+              <h3>PENDING USERS ({pendingUsers.length})</h3>
+              <div className="user-list">
+                {pendingUsers.length > 0 ? (
+                  pendingUsers.map(u => (
+                    <div key={u._id} className="user-item">
+                      <p>{u.email}</p>
+                      <p className="date">Requested: {new Date(u.createdAt).toLocaleDateString()}</p>
+                      <div className="actions">
+                        <button className="approve-btn" onClick={() => handleApprove(u._id)}>APPROVE</button>
+                        <button className="deny-btn" onClick={() => handleDeny(u._id)}>DENY</button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="empty-message">No pending users</p>
+                )}
+              </div>
+            </div>
+
+            <div className="verified-users">
+              <h3>ALL USERS ({adminAllUsers.length})</h3>
+              <div className="user-list">
+                {adminAllUsers.map(u => (
+                  <div key={u._id} className={`user-item ${u.status === 'approved' ? 'active' : ''}`}>
+                    <p>{u.email}</p>
+                    <p className="date">Status: {u.status.toUpperCase()}</p>
+                    <span className={u.status === 'approved' ? 'active-badge' : 'pending-badge'}>
+                      {u.status.toUpperCase()}
+                    </span>
+                    <button 
+                      className="edit-btn"
+                      onClick={() => {
+                        setAdminEditUser(u);
+                        setAdminEditData({ username: u.username || 'OPERATOR', avatar: u.avatar || null });
+                      }}
+                    >EDIT</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       </>
     );
   }
