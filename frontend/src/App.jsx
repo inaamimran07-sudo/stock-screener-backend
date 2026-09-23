@@ -42,6 +42,7 @@ function App() {
   useEffect(() => {
     if (token) {
       fetchUser();
+      setPage('dashboard');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -1003,6 +1004,15 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  // Fallback to login if page is not recognized
+  if (page === 'login' || !token) {
+    return <AuthPage onLogin={(token) => {
+      setToken(token);
+      localStorage.setItem('token', token);
+      setPage('dashboard');
+    }} />;
   }
 
   return null;
