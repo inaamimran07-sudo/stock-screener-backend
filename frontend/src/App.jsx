@@ -43,6 +43,7 @@ function App() {
     if (token) {
       fetchUser();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const fetchUser = async () => {
@@ -116,12 +117,14 @@ function App() {
       const interval = setInterval(fetchUsers, 5000);
       return () => clearInterval(interval);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, token]);
 
   useEffect(() => {
     if (page === 'admin' && user?.isAdmin) {
       fetchAdminData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, user]);
 
   const logout = () => {
