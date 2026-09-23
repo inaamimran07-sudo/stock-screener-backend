@@ -143,9 +143,11 @@ app.get('/api/users/me', verifyToken, async (req, res) => {
 
 app.put('/api/users/profile', verifyToken, async (req, res) => {
   try {
-    const { username, avatar } = req.body;
+    const { targetEmail, username, avatar } = req.body;
+    const emailToUpdate = targetEmail || req.user.email;
+    
     const user = await User.findOneAndUpdate(
-      { email: req.user.email },
+      { email: emailToUpdate },
       { username, avatar },
       { new: true }
     );
@@ -319,6 +321,9 @@ app.get('/api/portfolio/stats', verifyToken, async (req, res) => {
       console.error('T212 stats error:', err.message);
       res.json({ ok: true, stats: { totalValue: 0, cashBalance: 0, usedMargin: 0 } });
     }
+  } catch (err) {
+    console.error('Portfolio stats error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
