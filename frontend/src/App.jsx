@@ -18,11 +18,11 @@ function App() {
   const [screenerSearch, setScreenerSearch] = useState('');
   const [screenerResults, setScreenerResults] = useState([]);
   const [screenerLoading, setScreenerLoading] = useState(false);
-  const [screenerCache, setScreenerCache] = useState({}); // Cache of searched stocks
+  const [screenerCache, setScreenerCache] = useState({});
   const [peFilter, setPeFilter] = useState(50);
   const [priceFilter, setPriceFilter] = useState(0);
-  const [selectedStock, setSelectedStock] = useState(null); // For detailed view/orders
-  const [orderModal, setOrderModal] = useState(false); // Order execution modal
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [orderModal, setOrderModal] = useState(false);
   const [orderData, setOrderData] = useState({ ticker: '', quantity: 0, direction: 'BUY', orderType: 'MARKET' });
   
   // Messages State
@@ -32,7 +32,7 @@ function App() {
   const [gifModal, setGifModal] = useState(false);
   const [gifs, setGifs] = useState([]);
   const [imageFile, setImageFile] = useState(null);
-  const [profileZoom, setProfileZoom] = useState({}); // For chat profile pic zoom - { email: true/false }
+  const [profileZoom, setProfileZoom] = useState({});
   
   // AI Chat State
   const [aiChat, setAiChat] = useState([]);
@@ -41,10 +41,9 @@ function App() {
   // Admin State
   const [pendingUsers, setPendingUsers] = useState([]);
   const [adminAllUsers, setAdminAllUsers] = useState([]);
-  const [adminEditUser, setAdminEditUser] = useState(null); // Admin editing user
+  const [adminEditUser, setAdminEditUser] = useState(null);
   const [adminEditData, setAdminEditData] = useState({ username: '', avatar: null });
 
-  // Fetch user on mount
   useEffect(() => {
     if (token) {
       fetchUser();
@@ -144,6 +143,14 @@ function App() {
         user={user} 
       />
     );
+  }
+
+  if (!token) {
+    return <AuthPage onLogin={(token) => {
+      setToken(token);
+      localStorage.setItem('token', token);
+      setPage('dashboard');
+    }} />;
   }
 
   const Sidebar = () => (
@@ -302,7 +309,6 @@ function App() {
                     
                     const ticker = screenerSearch.toUpperCase();
                     
-                    // Check cache first
                     if (screenerCache[ticker]) {
                       setScreenerResults([screenerCache[ticker]]);
                       setSelectedStock(screenerCache[ticker]);
@@ -364,7 +370,6 @@ function App() {
                     
                     const ticker = screenerSearch.toUpperCase();
                     
-                    // Check cache first
                     if (screenerCache[ticker]) {
                       setScreenerResults([screenerCache[ticker]]);
                       setSelectedStock(screenerCache[ticker]);
@@ -446,17 +451,18 @@ function App() {
             <div className="screener-results">
               <table className="results-table">
                 <thead>
-                  <th>TICKER</th>
-                  <th>PRICE</th>
-                  <th>CHANGE</th>
-                  <th>P/E</th>
-                  <th>ROE</th>
-                  <th>DIVIDEND</th>
-                  <th>52W HIGH</th>
-                  <th>52W LOW</th>
-                  <th>SCORE</th>
-                  <th>ACTION</th>
-                </tr>
+                  <tr>
+                    <th>TICKER</th>
+                    <th>PRICE</th>
+                    <th>CHANGE</th>
+                    <th>P/E</th>
+                    <th>ROE</th>
+                    <th>DIVIDEND</th>
+                    <th>52W HIGH</th>
+                    <th>52W LOW</th>
+                    <th>SCORE</th>
+                    <th>ACTION</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {filteredResults.map((stock, i) => (
@@ -544,7 +550,6 @@ function App() {
                         gap: '8px'
                       }}
                     >
-                      {/* Profile picture - left side for others */}
                       {msg.fromEmail !== user.email && (
                         <div 
                           style={{
@@ -588,7 +593,6 @@ function App() {
                         </p>
                       </div>
 
-                      {/* Profile picture - right side for current user */}
                       {msg.fromEmail === user.email && (
                         <div 
                           style={{
@@ -637,7 +641,6 @@ function App() {
                               })
                             });
                             setMessageInput('');
-                            // Refresh messages
                             const res = await fetch(`${BACKEND_URL}/messages/${selectedUser.email}`, {
                               headers: { Authorization: `Bearer ${token}` }
                             });
@@ -669,7 +672,6 @@ function App() {
                             })
                           });
                           setMessageInput('');
-                          // Refresh messages
                           const res = await fetch(`${BACKEND_URL}/messages/${selectedUser.email}`, {
                             headers: { Authorization: `Bearer ${token}` }
                           });
@@ -812,7 +814,6 @@ function App() {
           </div>
         </div>
 
-        {/* ORDER EXECUTION MODAL */}
         {orderModal && (
           <div className="modal-overlay" onClick={() => setOrderModal(false)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -865,7 +866,6 @@ function App() {
           </div>
         )}
 
-        {/* ADMIN EDIT USER MODAL */}
         {adminEditUser && (
           <div className="modal-overlay" onClick={() => setAdminEditUser(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1168,6 +1168,7 @@ function AuthPage({ onLogin }) {
         )}
       </div>
     </div>
-    );
-  }
+  );
+}
+
 export default App;
