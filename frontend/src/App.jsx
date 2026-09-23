@@ -1006,8 +1006,8 @@ function App() {
     );
   }
 
-  // Fallback to login if page is not recognized
-  if (page === 'login' || !token) {
+  // Fallback: Show login if page is login
+  if (page === 'login') {
     return <AuthPage onLogin={(token) => {
       setToken(token);
       localStorage.setItem('token', token);
