@@ -23,6 +23,13 @@ function App() {
   // Screener data
   const [screenerSearch, setScreenerSearch] = useState('');
   const [screenerResults, setScreenerResults] = useState([]);
+  const [screenerCache, setScreenerCache] = useState({}); // Cache of searched stocks
+  const [selectedStock, setSelectedStock] = useState(null); // For detailed view/orders
+  const [orderModal, setOrderModal] = useState(false); // Order execution modal
+  const [orderData, setOrderData] = useState({ ticker: '', quantity: 0, direction: 'BUY', orderType: 'MARKET' });
+  const [profileZoom, setProfileZoom] = useState({}); // For chat profile pic zoom - { email: true/false }
+  const [adminEditUser, setAdminEditUser] = useState(null); // Admin editing user
+  const [adminEditData, setAdminEditData] = useState({ username: '', avatar: null });
   const [screenerLoading, setScreenerLoading] = useState(false);
   const [peFilter, setPeFilter] = useState(100);
   const [priceFilter, setPriceFilter] = useState(0);
@@ -490,8 +497,16 @@ function App() {
                   onKeyPress={(e) => e.key === 'Enter' && (() => {
                     if (!screenerSearch.trim()) return;
                     
-                    setScreenerLoading(true);
                     const ticker = screenerSearch.toUpperCase();
+                    
+                    // Check cache first
+                    if (screenerCache[ticker]) {
+                      setScreenerResults([screenerCache[ticker]]);
+                      setSelectedStock(screenerCache[ticker]);
+                      return;
+                    }
+                    
+                    setScreenerLoading(true);
                     
                     Promise.all([
                       fetch(`${BACKEND_URL}/data/stock/${ticker}`, {
@@ -505,26 +520,27 @@ function App() {
                       const fundData = await fundRes.json();
 
                       if (stockData.ok && fundData.ok) {
-                        // Twelve Data returns: close, change, percent_change, fifty_two_week_high, fifty_two_week_low
                         const price = parseFloat(stockData.data?.close) || 0;
                         const changePercent = parseFloat(stockData.data?.percent_change) || 0;
                         
-                        // Finnhub returns: pe, h (52w high), l (52w low)
-                        const pe = parseFloat(fundData.fundamentals?.pe) || null;
-                        const high52 = parseFloat(fundData.fundamentals?.h) || parseFloat(fundData.fundamentals?.['52WeekHigh']) || null;
-                        const low52 = parseFloat(fundData.fundamentals?.l) || parseFloat(fundData.fundamentals?.['52WeekLow']) || null;
-                        
-                        setScreenerResults([{
+                        const stock = {
                           ticker: ticker,
                           price: price,
                           change: changePercent,
                           changePercent: changePercent,
-                          pe: pe,
-                          roe: 'N/A',
-                          score: Math.floor(Math.random() * 100),
-                          high52: high52,
-                          low52: low52,
-                        }]);
+                          pe: fundData.fundamentals?.pe || 'N/A',
+                          roe: fundData.fundamentals?.roe || 'N/A',
+                          dividend: fundData.fundamentals?.dividend || 0,
+                          marketCap: fundData.fundamentals?.marketCap || 'N/A',
+                          industry: fundData.fundamentals?.industry || 'N/A',
+                          score: Math.round(fundData.fundamentals?.score || 50),
+                          high52: fundData.fundamentals?.high52w || 'N/A',
+                          low52: fundData.fundamentals?.low52w || 'N/A',
+                        };
+                        
+                        setScreenerResults([stock]);
+                        setScreenerCache(prev => ({ ...prev, [ticker]: stock }));
+                        setSelectedStock(stock);
                       } else {
                         setScreenerResults([]);
                         alert('Stock not found.');
@@ -541,8 +557,15 @@ function App() {
                   onClick={() => {
                     if (!screenerSearch.trim()) return;
                     
-                    setScreenerLoading(true);
                     const ticker = screenerSearch.toUpperCase();
+                    
+                    // Check cache first
+                    if (screenerCache[ticker]) {
+                      setScreenerResults([screenerCache[ticker]]);
+                      return;
+                    }
+                    
+                    setScreenerLoading(true);
                     
                     Promise.all([
                       fetch(`${BACKEND_URL}/data/stock/${ticker}`, {
@@ -556,26 +579,27 @@ function App() {
                       const fundData = await fundRes.json();
 
                       if (stockData.ok && fundData.ok) {
-                        // Twelve Data returns: close, change, percent_change, fifty_two_week_high, fifty_two_week_low
                         const price = parseFloat(stockData.data?.close) || 0;
                         const changePercent = parseFloat(stockData.data?.percent_change) || 0;
                         
-                        // Finnhub returns: pe, h (52w high), l (52w low)
-                        const pe = parseFloat(fundData.fundamentals?.pe) || null;
-                        const high52 = parseFloat(fundData.fundamentals?.h) || parseFloat(fundData.fundamentals?.['52WeekHigh']) || null;
-                        const low52 = parseFloat(fundData.fundamentals?.l) || parseFloat(fundData.fundamentals?.['52WeekLow']) || null;
-                        
-                        setScreenerResults([{
+                        const stock = {
                           ticker: ticker,
                           price: price,
                           change: changePercent,
                           changePercent: changePercent,
-                          pe: pe,
-                          roe: 'N/A',
-                          score: Math.floor(Math.random() * 100),
-                          high52: high52,
-                          low52: low52,
-                        }]);
+                          pe: fundData.fundamentals?.pe || 'N/A',
+                          roe: fundData.fundamentals?.roe || 'N/A',
+                          dividend: fundData.fundamentals?.dividend || 0,
+                          marketCap: fundData.fundamentals?.marketCap || 'N/A',
+                          industry: fundData.fundamentals?.industry || 'N/A',
+                          score: Math.round(fundData.fundamentals?.score || 50),
+                          high52: fundData.fundamentals?.high52w || 'N/A',
+                          low52: fundData.fundamentals?.low52w || 'N/A',
+                        };
+                        
+                        setScreenerResults([stock]);
+                        setScreenerCache(prev => ({ ...prev, [ticker]: stock })); // Cache it
+                        setSelectedStock(stock); // Auto-select for detailed view
                       } else {
                         setScreenerResults([]);
                         alert('Stock not found.');
@@ -626,23 +650,46 @@ function App() {
                   <th>PRICE</th>
                   <th>CHANGE</th>
                   <th>P/E</th>
+                  <th>ROE</th>
+                  <th>DIVIDEND</th>
                   <th>52W HIGH</th>
                   <th>52W LOW</th>
                   <th>SCORE</th>
+                  <th>ACTION</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredResults.map((stock, i) => (
-                  <tr key={i}>
+                  <tr key={i} onClick={() => setSelectedStock(stock)} style={{ cursor: 'pointer' }}>
                     <td className="ticker">{stock.ticker}</td>
                     <td>${typeof stock.price === 'number' ? stock.price.toFixed(2) : 'N/A'}</td>
                     <td className={stock.change > 0 ? 'positive' : 'negative'}>
                       {stock.change > 0 ? '+' : ''}{typeof stock.change === 'number' ? stock.change.toFixed(2) : 'N/A'}%
                     </td>
                     <td>{typeof stock.pe === 'number' ? stock.pe.toFixed(2) : 'N/A'}</td>
+                    <td>{typeof stock.roe === 'number' ? stock.roe.toFixed(2) + '%' : 'N/A'}</td>
+                    <td>{typeof stock.dividend === 'number' ? (stock.dividend * 100).toFixed(2) + '%' : 'N/A'}</td>
                     <td>${typeof stock.high52 === 'number' ? stock.high52.toFixed(2) : 'N/A'}</td>
                     <td>${typeof stock.low52 === 'number' ? stock.low52.toFixed(2) : 'N/A'}</td>
-                    <td className="score">{stock.score}</td>
+                    <td className="score" title={`Score: ${stock.score}/100 - Based on professional metrics (P/E, ROE, Dividend Yield, Growth)`}>{stock.score}</td>
+                    <td>
+                      <button 
+                        className="action-btn buy-btn" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOrderData({ ticker: stock.ticker, quantity: 1, direction: 'BUY', orderType: 'MARKET' });
+                          setOrderModal(true);
+                        }}
+                      >BUY</button>
+                      <button 
+                        className="action-btn sell-btn" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOrderData({ ticker: stock.ticker, quantity: 1, direction: 'SELL', orderType: 'MARKET' });
+                          setOrderModal(true);
+                        }}
+                      >SELL</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -710,9 +757,36 @@ function App() {
                       key={i}
                       style={{
                         textAlign: msg.fromEmail === user.email ? 'right' : 'left',
-                        marginBottom: '10px'
+                        marginBottom: '10px',
+                        display: 'flex',
+                        alignItems: 'flex-end',
+                        justifyContent: msg.fromEmail === user.email ? 'flex-end' : 'flex-start',
+                        gap: '8px'
                       }}
                     >
+                      {/* Profile picture - left side for others */}
+                      {msg.fromEmail !== user.email && (
+                        <div 
+                          style={{
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '50%',
+                            background: '#00ff88',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            transform: profileZoom[msg.fromEmail] ? 'scale(2)' : 'scale(1)',
+                            transition: 'transform 0.3s ease'
+                          }}
+                          onClick={() => setProfileZoom(prev => ({ ...prev, [msg.fromEmail]: !prev[msg.fromEmail] }))}
+                        >
+                          <img 
+                            src={users.find(u => u.email === msg.fromEmail)?.avatar || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='30' r='20' fill='%23000'/%3E%3Cellipse cx='50' cy='70' rx='30' ry='25' fill='%23000'/%3E%3C/svg%3E`}
+                            alt="avatar"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                      )}
+                      
                       <div
                         style={{
                           display: 'inline-block',
@@ -733,6 +807,29 @@ function App() {
                           {new Date(msg.createdAt).toLocaleTimeString()}
                         </p>
                       </div>
+
+                      {/* Profile picture - right side for current user */}
+                      {msg.fromEmail === user.email && (
+                        <div 
+                          style={{
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '50%',
+                            background: '#00ff88',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            transform: profileZoom[user.email] ? 'scale(2)' : 'scale(1)',
+                            transition: 'transform 0.3s ease'
+                          }}
+                          onClick={() => setProfileZoom(prev => ({ ...prev, [user.email]: !prev[user.email] }))}
+                        >
+                          <img 
+                            src={userAvatar || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='30' r='20' fill='%23000'/%3E%3Cellipse cx='50' cy='70' rx='30' ry='25' fill='%23000'/%3E%3C/svg%3E`}
+                            alt="avatar"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                   <div ref={messagesEndRef} />
@@ -1075,6 +1172,13 @@ function App() {
                     <span className={u.status === 'approved' ? 'active-badge' : 'pending-badge'}>
                       {u.status.toUpperCase()}
                     </span>
+                    <button 
+                      className="edit-btn"
+                      onClick={() => {
+                        setAdminEditUser(u);
+                        setAdminEditData({ username: u.username || 'OPERATOR', avatar: u.avatar || null });
+                      }}
+                    >EDIT</button>
                   </div>
                 ))}
               </div>
@@ -1242,6 +1346,115 @@ function AuthPage({ onLogin }) {
           </form>
         )}
       </div>
+
+      {/* ORDER EXECUTION MODAL */}
+      {orderModal && (
+        <div className="modal-overlay" onClick={() => setOrderModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>EXECUTE ORDER</h2>
+            <div className="form-group">
+              <label>TICKER</label>
+              <input type="text" value={orderData.ticker} disabled />
+            </div>
+            <div className="form-group">
+              <label>DIRECTION</label>
+              <select value={orderData.direction} onChange={(e) => setOrderData({...orderData, direction: e.target.value})}>
+                <option>BUY</option>
+                <option>SELL</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>QUANTITY</label>
+              <input type="number" min="1" value={orderData.quantity} onChange={(e) => setOrderData({...orderData, quantity: parseInt(e.target.value)})} />
+            </div>
+            <div className="form-group">
+              <label>ORDER TYPE</label>
+              <select value={orderData.orderType} onChange={(e) => setOrderData({...orderData, orderType: e.target.value})}>
+                <option>MARKET</option>
+                <option>LIMIT</option>
+              </select>
+            </div>
+            <button className="execute-btn" onClick={async () => {
+              try {
+                const res = await fetch(`${BACKEND_URL}/orders/execute`, {
+                  method: 'POST',
+                  headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(orderData)
+                });
+                const data = await res.json();
+                if (data.ok) {
+                  alert(`Order executed! Order ID: ${data.orderId}`);
+                  setOrderModal(false);
+                } else {
+                  alert('Order failed: ' + (data.error || 'Unknown error'));
+                }
+              } catch (err) {
+                alert('Error executing order: ' + err.message);
+              }
+            }}>CONFIRM ORDER</button>
+            <button className="cancel-btn" onClick={() => setOrderModal(false)}>CANCEL</button>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN EDIT USER MODAL */}
+      {adminEditUser && (
+        <div className="modal-overlay" onClick={() => setAdminEditUser(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>EDIT USER</h2>
+            <div className="form-group">
+              <label>EMAIL</label>
+              <input type="email" value={adminEditUser.email} disabled />
+            </div>
+            <div className="form-group">
+              <label>USERNAME</label>
+              <input type="text" value={adminEditData.username} onChange={(e) => setAdminEditData({...adminEditData, username: e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label>PROFILE PICTURE</label>
+              <input type="file" onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (ev) => setAdminEditData({...adminEditData, avatar: ev.target.result});
+                  reader.readAsDataURL(file);
+                }
+              }} />
+            </div>
+            <button className="save-btn" onClick={async () => {
+              try {
+                const res = await fetch(`${BACKEND_URL}/users/profile`, {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    targetEmail: adminEditUser.email,
+                    username: adminEditData.username,
+                    avatar: adminEditData.avatar
+                  })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                  alert('User updated!');
+                  setAdminEditUser(null);
+                  // Refresh admin data
+                  fetchPendingUsers();
+                } else {
+                  alert('Update failed: ' + (data.error || 'Unknown error'));
+                }
+              } catch (err) {
+                alert('Error: ' + err.message);
+              }
+            }}>SAVE CHANGES</button>
+            <button className="cancel-btn" onClick={() => setAdminEditUser(null)}>CANCEL</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
