@@ -1061,13 +1061,14 @@ function App() {
     };
 
     return (
-      <div className="app-container">
-        <Sidebar />
-        <div className="main-content">
-          <header className="header">
-            <h2>AI MARKET ANALYST</h2>
-            <p className="subtitle">INTELLIGENT PORTFOLIO OVERVIEW (CLAUDE 3.5)</p>
-          </header>
+      <>
+        <div className="app-container">
+          <Sidebar />
+          <div className="main-content">
+            <header className="header">
+              <h2>AI MARKET ANALYST</h2>
+              <p className="subtitle">INTELLIGENT PORTFOLIO OVERVIEW (CLAUDE 3.5)</p>
+            </header>
 
           <div className="ai-chat-container">
             <div className="chat-messages">
@@ -1294,6 +1295,7 @@ function App() {
           </div>
         </div>
       )}
+      </>
     );
   }
 
