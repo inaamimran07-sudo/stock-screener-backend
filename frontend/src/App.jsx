@@ -1297,7 +1297,6 @@ function App() {
         </div>
       </div>
 
-      </>
     );
   }
 
