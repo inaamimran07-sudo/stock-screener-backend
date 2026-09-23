@@ -1186,6 +1186,114 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* ORDER EXECUTION MODAL */}
+      {orderModal && (
+        <div className="modal-overlay" onClick={() => setOrderModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>EXECUTE ORDER</h2>
+            <div className="form-group">
+              <label>TICKER</label>
+              <input type="text" value={orderData.ticker} disabled />
+            </div>
+            <div className="form-group">
+              <label>DIRECTION</label>
+              <select value={orderData.direction} onChange={(e) => setOrderData({...orderData, direction: e.target.value})}>
+                <option>BUY</option>
+                <option>SELL</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>QUANTITY</label>
+              <input type="number" min="1" value={orderData.quantity} onChange={(e) => setOrderData({...orderData, quantity: parseInt(e.target.value)})} />
+            </div>
+            <div className="form-group">
+              <label>ORDER TYPE</label>
+              <select value={orderData.orderType} onChange={(e) => setOrderData({...orderData, orderType: e.target.value})}>
+                <option>MARKET</option>
+                <option>LIMIT</option>
+              </select>
+            </div>
+            <button className="execute-btn" onClick={async () => {
+              try {
+                const res = await fetch(`${BACKEND_URL}/orders/execute`, {
+                  method: 'POST',
+                  headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(orderData)
+                });
+                const data = await res.json();
+                if (data.ok) {
+                  alert(`Order executed! Order ID: ${data.orderId}`);
+                  setOrderModal(false);
+                } else {
+                  alert('Order failed: ' + (data.error || 'Unknown error'));
+                }
+              } catch (err) {
+                alert('Error executing order: ' + err.message);
+              }
+            }}>CONFIRM ORDER</button>
+            <button className="cancel-btn" onClick={() => setOrderModal(false)}>CANCEL</button>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN EDIT USER MODAL */}
+      {adminEditUser && (
+        <div className="modal-overlay" onClick={() => setAdminEditUser(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>EDIT USER</h2>
+            <div className="form-group">
+              <label>EMAIL</label>
+              <input type="email" value={adminEditUser.email} disabled />
+            </div>
+            <div className="form-group">
+              <label>USERNAME</label>
+              <input type="text" value={adminEditData.username} onChange={(e) => setAdminEditData({...adminEditData, username: e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label>PROFILE PICTURE</label>
+              <input type="file" onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (ev) => setAdminEditData({...adminEditData, avatar: ev.target.result});
+                  reader.readAsDataURL(file);
+                }
+              }} />
+            </div>
+            <button className="save-btn" onClick={async () => {
+              try {
+                const res = await fetch(`${BACKEND_URL}/users/profile`, {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    targetEmail: adminEditUser.email,
+                    username: adminEditData.username,
+                    avatar: adminEditData.avatar
+                  })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                  alert('User updated!');
+                  setAdminEditUser(null);
+                  fetchPendingUsers();
+                } else {
+                  alert('Update failed: ' + (data.error || 'Unknown error'));
+                }
+              } catch (err) {
+                alert('Error: ' + err.message);
+              }
+            }}>SAVE CHANGES</button>
+            <button className="cancel-btn" onClick={() => setAdminEditUser(null)}>CANCEL</button>
+          </div>
+        </div>
+      )}
     );
   }
 
@@ -1346,117 +1454,6 @@ function AuthPage({ onLogin }) {
           </form>
         )}
       </div>
-
-      {/* ORDER EXECUTION MODAL */}
-      {orderModal && (
-        <div className="modal-overlay" onClick={() => setOrderModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>EXECUTE ORDER</h2>
-            <div className="form-group">
-              <label>TICKER</label>
-              <input type="text" value={orderData.ticker} disabled />
-            </div>
-            <div className="form-group">
-              <label>DIRECTION</label>
-              <select value={orderData.direction} onChange={(e) => setOrderData({...orderData, direction: e.target.value})}>
-                <option>BUY</option>
-                <option>SELL</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>QUANTITY</label>
-              <input type="number" min="1" value={orderData.quantity} onChange={(e) => setOrderData({...orderData, quantity: parseInt(e.target.value)})} />
-            </div>
-            <div className="form-group">
-              <label>ORDER TYPE</label>
-              <select value={orderData.orderType} onChange={(e) => setOrderData({...orderData, orderType: e.target.value})}>
-                <option>MARKET</option>
-                <option>LIMIT</option>
-              </select>
-            </div>
-            <button className="execute-btn" onClick={async () => {
-              try {
-                const res = await fetch(`${BACKEND_URL}/orders/execute`, {
-                  method: 'POST',
-                  headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify(orderData)
-                });
-                const data = await res.json();
-                if (data.ok) {
-                  alert(`Order executed! Order ID: ${data.orderId}`);
-                  setOrderModal(false);
-                } else {
-                  alert('Order failed: ' + (data.error || 'Unknown error'));
-                }
-              } catch (err) {
-                alert('Error executing order: ' + err.message);
-              }
-            }}>CONFIRM ORDER</button>
-            <button className="cancel-btn" onClick={() => setOrderModal(false)}>CANCEL</button>
-          </div>
-        </div>
-      )}
-
-      {/* ADMIN EDIT USER MODAL */}
-      {adminEditUser && (
-        <div className="modal-overlay" onClick={() => setAdminEditUser(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>EDIT USER</h2>
-            <div className="form-group">
-              <label>EMAIL</label>
-              <input type="email" value={adminEditUser.email} disabled />
-            </div>
-            <div className="form-group">
-              <label>USERNAME</label>
-              <input type="text" value={adminEditData.username} onChange={(e) => setAdminEditData({...adminEditData, username: e.target.value})} />
-            </div>
-            <div className="form-group">
-              <label>PROFILE PICTURE</label>
-              <input type="file" onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (ev) => setAdminEditData({...adminEditData, avatar: ev.target.result});
-                  reader.readAsDataURL(file);
-                }
-              }} />
-            </div>
-            <button className="save-btn" onClick={async () => {
-              try {
-                const res = await fetch(`${BACKEND_URL}/users/profile`, {
-                  method: 'PUT',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    targetEmail: adminEditUser.email,
-                    username: adminEditData.username,
-                    avatar: adminEditData.avatar
-                  })
-                });
-                const data = await res.json();
-                if (data.ok) {
-                  alert('User updated!');
-                  setAdminEditUser(null);
-                  // Refresh admin data
-                  fetchPendingUsers();
-                } else {
-                  alert('Update failed: ' + (data.error || 'Unknown error'));
-                }
-              } catch (err) {
-                alert('Error: ' + err.message);
-              }
-            }}>SAVE CHANGES</button>
-            <button className="cancel-btn" onClick={() => setAdminEditUser(null)}>CANCEL</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
+    );
+  }
 export default App;
