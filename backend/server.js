@@ -295,18 +295,108 @@ app.get('/api/portfolio/stats', verifyToken, async (req, res) => {
       return res.json({ ok: true, stats: { totalValue: 0, cashBalance: 0, usedMargin: 0 } });
     }
     
-    const accountRes = await axios.get('https://api.trading212.com/api/v0/account', {
-      headers: { Authorization: user.t212ApiKey }
-    });
-    const data = accountRes.data;
-    res.json({ ok: true, stats: {
-      totalValue: data.equity || 0,
-      cashBalance: data.cash || 0,
-      usedMargin: (data.equity - data.cash) || 0
-    }});
+    try {
+      // Try /accounts/account first (paper trading endpoint)
+      let accountRes;
+      try {
+        accountRes = await axios.get('https://api.trading212.com/api/v0/accounts/account', {
+          headers: { Authorization: user.t212ApiKey }
+        });
+      } catch {
+        // Fallback to /account
+        accountRes = await axios.get('https://api.trading212.com/api/v0/account', {
+          headers: { Authorization: user.t212ApiKey }
+        });
+      }
+      
+      const data = accountRes.data;
+      res.json({ ok: true, stats: {
+        totalValue: data.equity || data.totalValue || 0,
+        cashBalance: data.cash || data.availableFunds || 0,
+        usedMargin: (data.equity - data.cash) || (data.totalValue - data.availableFunds) || 0
+      }});
+    } catch (err) {
+      console.error('T212 stats error:', err.message);
+      res.json({ ok: true, stats: { totalValue: 0, cashBalance: 0, usedMargin: 0 } });
+    }
+  }
+});
+
+// ============ PROFESSIONAL STOCK SCORING ============
+
+function calculateProfessionalScore(fundamentals) {
+  // Score based on professional metrics (0-100)
+  let score = 50; // Base score
+  
+  const pe = fundamentals.pe;
+  const dividend = fundamentals.dividend || 0;
+  const roe = fundamentals.roe || 0;
+  const eps_growth = fundamentals.eps_growth || 0;
+  const revenue_growth = fundamentals.revenue_growth || 0;
+  
+  // P/E Ratio scoring (lower is better, but context matters)
+  if (pe && pe > 0 && pe < 50) {
+    score += (50 - pe) / 2; // Max +25 points for low P/E
+  }
+  
+  // Dividend Yield (higher is better)
+  if (dividend > 0) {
+    score += Math.min(dividend * 50, 15); // Max +15 points
+  }
+  
+  // ROE (higher is better, 15%+ is excellent)
+  if (roe > 0) {
+    score += Math.min(roe / 5, 20); // Max +20 points
+  }
+  
+  // EPS Growth (higher is better)
+  if (eps_growth > 0) {
+    score += Math.min(eps_growth / 2, 15); // Max +15 points
+  }
+  
+  // Revenue Growth (higher is better)
+  if (revenue_growth > 0) {
+    score += Math.min(revenue_growth / 2, 10); // Max +10 points
+  }
+  
+  // Cap at 100
+  return Math.min(score, 100);
+}
+
+// ============ ORDER EXECUTION ============
+
+app.post('/api/orders/execute', verifyToken, async (req, res) => {
+  try {
+    const { ticker, quantity, direction, orderType } = req.body;
+    const user = await User.findOne({ email: req.user.email });
+    
+    if (!user?.t212Connected || !user?.t212ApiKey) {
+      return res.status(400).json({ ok: false, error: 'T212 not connected' });
+    }
+    
+    if (!ticker || !quantity || !direction || !orderType) {
+      return res.status(400).json({ ok: false, error: 'Missing required fields' });
+    }
+    
+    try {
+      const orderRes = await axios.post('https://api.trading212.com/api/v0/orders', {
+        ticker: ticker,
+        quantity: quantity,
+        side: direction.toUpperCase(), // BUY or SELL
+        orderType: orderType.toUpperCase(), // MARKET or LIMIT
+        timeInForce: 'GTC'
+      }, {
+        headers: { Authorization: user.t212ApiKey }
+      });
+      
+      res.json({ ok: true, orderId: orderRes.data.orderId, status: orderRes.data.status });
+    } catch (err) {
+      console.error('Order execution error:', err.response?.data || err.message);
+      res.status(400).json({ ok: false, error: err.response?.data?.message || 'Order failed' });
+    }
   } catch (err) {
-    console.error('T212 stats error:', err.message);
-    res.json({ ok: true, stats: { totalValue: 0, cashBalance: 0, usedMargin: 0 } });
+    console.error('Order error:', err.message);
+    res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
 
@@ -338,14 +428,61 @@ app.get('/api/data/stock/:ticker', verifyToken, async (req, res) => {
 app.get('/api/fundamentals/:ticker', verifyToken, async (req, res) => {
   try {
     const { ticker } = req.params;
-    const response = await axios.get(`https://finnhub.io/api/v1/quote`, {
+    
+    // Get quote data
+    const quoteRes = await axios.get(`https://finnhub.io/api/v1/quote`, {
       params: {
         symbol: ticker,
         token: FINNHUB_API_KEY
       }
     });
-    res.json({ ok: true, fundamentals: response.data });
+    
+    // Get company profile (includes market cap, dividend)
+    const profileRes = await axios.get(`https://finnhub.io/api/v1/stock/profile2`, {
+      params: {
+        symbol: ticker,
+        token: FINNHUB_API_KEY
+      }
+    }).catch(() => ({ data: {} }));
+    
+    // Get basic financials for metrics
+    const financialsRes = await axios.get(`https://finnhub.io/api/v1/stock/metric`, {
+      params: {
+        symbol: ticker,
+        metric: 'all',
+        token: FINNHUB_API_KEY
+      }
+    }).catch(() => ({ data: { metric: {} } }));
+    
+    const quote = quoteRes.data;
+    const profile = profileRes.data;
+    const metrics = financialsRes.data.metric || {};
+    
+    // Compile all fundamentals
+    const fundamentals = {
+      pe: quote.pe || metrics.peNormalizedAnnual || null,
+      dividend: profile.dividendYield || 0,
+      roe: metrics.roe || null,
+      eps_growth: metrics.epsGrowth5Y || null,
+      revenue_growth: metrics.revenuePerShareGrowth5Y || null,
+      marketCap: profile.marketCapitalization || null,
+      name: profile.name || ticker,
+      country: profile.country || 'N/A',
+      industry: profile.finnhubIndustry || 'N/A',
+      currency: profile.currency || 'USD',
+      price: quote.c || 0,
+      high52w: quote.h || null,
+      low52w: quote.l || null,
+      change: quote.d || 0,
+      changePercent: quote.dp || 0
+    };
+    
+    // Calculate professional score
+    fundamentals.score = calculateProfessionalScore(fundamentals);
+    
+    res.json({ ok: true, fundamentals });
   } catch (err) {
+    console.error('Fundamentals error:', err.message);
     res.status(500).json({ ok: false, error: 'Fundamentals not found' });
   }
 });
@@ -378,7 +515,7 @@ app.post('/api/ai/chat', verifyToken, async (req, res) => {
     }
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-opus-4-1-20250805',
       max_tokens: 1024,
       system: 'You are an expert stock market analyst and financial advisor. Provide insightful, accurate information about stocks, trading strategies, and market trends. Be concise but informative.',
       messages: [
